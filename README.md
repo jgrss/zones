@@ -11,7 +11,7 @@ Currently, polygon zones are supported, but support for point data will
 also be added.
 
 
-### Zonal stats with polygon data
+### Zonal stats with polygon and raster data
 
 ```python
 >>> import zones
@@ -22,6 +22,20 @@ also be added.
 >>> df = zs.calculate(['mean'])
 >>>
 >>> # Multiple statistics
+>>> df = zs.calculate(['nanmean', 'nansum'])
+>>>
+>>> # Save data to file
+>>> df.to_file('stats.shp')
+>>> df.to_csv('stats.csv')
+```
+
+### Zonal stats with polygon and point data (stored in a CSV file)
+
+```python
+>>> import zones
+>>>
+>>> zs = zones.PointStats('values.csv', 'zones.shp', x_column='X', y_column='Y', verbose=2)
+>>>
 >>> df = zs.calculate(['nanmean', 'nansum'])
 >>>
 >>> # Save data to file

@@ -13,6 +13,42 @@ import geopandas as gpd
 
 class ZonesBase(object):
 
+    def calculate(self, stats):
+
+        """
+        Args:
+            stats (str list)
+
+        Returns:
+            DataFrame
+        """
+
+        self._check_arguments(stats)
+
+        self.stats = stats
+
+        if self.verbose > 0:
+            logger.info('  Preparing files ...')
+
+        self._prepare_files(self.zones, self.values)
+
+        if self.verbose > 0:
+            logger.info('  Preparing zones ...')
+
+        self.zone_values = self._prepare_zones(self.unique_column)
+
+        if self.verbose > 0:
+            logger.info('  Calculating stats ...')
+
+        self._iter(self.stats)
+
+        if self.verbose > 0:
+            logger.info('  Finalizing data ...')
+
+        self._close_files()
+
+        return self._finalize_dataframe()
+
     def _prepare_files(self, zones, values):
 
         self.values_df = None

@@ -14,7 +14,7 @@ class RasterStats(ZonesBase):
 
     """
     Args:
-        values (str): The values file. Can be float or categorical raster, or points.
+        values (str): The raster values file. Can be float or categorical raster.
         zones (str): The zones file. It should be a polygon vector file.
         unique_column (Optional[str]): A unique column identifier. Default is None.
 
@@ -35,44 +35,7 @@ class RasterStats(ZonesBase):
         self.verbose = verbose
 
         self.stats = None
-        self.stat_func = None
         self.zone_values = None
-
-    def calculate(self, stats):
-
-        """
-        Args:
-            stats (str list)
-
-        Returns:
-            DataFrame
-        """
-
-        self._check_arguments(stats)
-
-        self.stats = stats
-
-        if self.verbose > 0:
-            logger.info('  Preparing files ...')
-
-        self._prepare_files(self.zones, self.values)
-
-        if self.verbose > 0:
-            logger.info('  Preparing zones ...')
-
-        self.zone_values = self._prepare_zones(self.unique_column)
-
-        if self.verbose > 0:
-            logger.info('  Calculating stats ...')
-
-        self._iter(self.stats)
-
-        if self.verbose > 0:
-            logger.info('  Finalizing data ...')
-
-        self._close_files()
-
-        return self._finalize_dataframe()
 
     def _iter(self, stats):
 
@@ -109,10 +72,10 @@ class RasterStats(ZonesBase):
 
             for sidx, stat in enumerate(stats):
 
-                self.stat_func = STAT_DICT[stat]
+                stat_func = STAT_DICT[stat]
 
                 # TODO: if zones are not unique
-                self.zone_values[didx][sidx] = self.stat_func(image_array)
+                self.zone_values[didx][sidx] = stat_func(image_array)
 
     @staticmethod
     def _rasterize(geom, proj4, image_src, image_name):
@@ -121,7 +84,7 @@ class RasterStats(ZonesBase):
         Rasterizes a polygon geometry
         """
 
-        left, bottom, right, top = geom.bounds
+        # left, bottom, right, top = geom.bounds
 
         # Create a memory layer to rasterize from.
         datasource = ogr.GetDriverByName('Memory').CreateDataSource('wrk')
