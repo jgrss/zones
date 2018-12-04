@@ -1,0 +1,8 @@
+import geopandas as gpd
+
+
+class ZonesBase(object):
+
+    def _prepare_files(self):
+
+        self.zones_df = gpd.read_file(self.zones)

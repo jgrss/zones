@@ -1,0 +1,20 @@
+# OSX
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Python
+*.c
+*.so
+*.pyd
+*.log
+*.pyo
+*.pyc
+.idea
+build/
+dist/
+.ipynb_checkpoints
