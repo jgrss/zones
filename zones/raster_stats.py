@@ -1,8 +1,10 @@
+from __future__ import division
+
 from .base import ZonesBase
 from .errors import logger
 from .stats import STAT_DICT
 
-from mpglue import raster_tools
+from mpglue import raster_tools, vector_tools
 
 import numpy as np
 from osgeo import gdal, ogr, osr
@@ -125,24 +127,36 @@ class RasterStats(ZonesBase):
         datasource = ogr.GetDriverByName('Memory').CreateDataSource('wrk')
         sp_ref = osr.SpatialReference()
         sp_ref.ImportFromProj4(proj4)
-        lyr = datasource.CreateLayer('', geom_type=ogr.wkbPolygon, srs=sp_ref)
 
+        # Transform the geometry
+        target_sr = osr.SpatialReference()
+        target_sr.ImportFromWkt(image_src.projection)
+        transform = osr.CoordinateTransformation(sp_ref, target_sr)
+        gdal_geom = ogr.CreateGeometryFromWkt(geom.to_wkt())
+        gdal_geom.Transform(transform)
+
+        # Get the transformation boundary
+        left, right, bottom, top = gdal_geom.GetEnvelope()
+
+        # Create the new layer
+        lyr = datasource.CreateLayer('', geom_type=ogr.wkbPolygon, srs=target_sr)
         field_def = ogr.FieldDefn('Value', ogr.OFTInteger)
         lyr.CreateField(field_def)
 
+        # Add a feature
         feature = ogr.Feature(lyr.GetLayerDefn())
-        feature.SetGeometryDirectly(ogr.Geometry(wkt=str(geom)))
+        feature.SetGeometryDirectly(ogr.Geometry(wkt=str(gdal_geom)))
         feature.SetField('Value', 1)
         lyr.CreateFeature(feature)
 
-        xcount = int((right - left) / image_src.cellY) + 1
-        ycount = int((top - bottom) / image_src.cellY) + 1
+        xcount = int(round((right - left) / image_src.cellY))
+        ycount = int(round((top - bottom) / image_src.cellY))
 
         # Create a raster to rasterize into.
         target_ds = gdal.GetDriverByName('MEM').Create('', xcount, ycount, 1, gdal.GDT_Byte)
 
         target_ds.SetGeoTransform([left, image_src.cellY, 0., top, 0., -image_src.cellY])
-        target_ds.SetProjection(sp_ref.ExportToWkt())
+        target_ds.SetProjection(target_sr.ExportToWkt())
 
         # Rasterize
         gdal.RasterizeLayer(target_ds, [1], lyr, options=['ATTRIBUTE=Value'])
@@ -162,7 +176,7 @@ class RasterStats(ZonesBase):
         src = raster_tools.warp(image_name,
                                 'temp.mem',
                                 format='MEM',
-                                out_proj=proj4,
+                                out_proj=image_src.projection,
                                 multithread=True,
                                 outputBounds=[left, top-(ycount*image_src.cellY), left+(xcount*image_src.cellY), top],
                                 cell_size=image_src.cellY,

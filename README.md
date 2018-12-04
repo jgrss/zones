@@ -28,3 +28,13 @@ also be added.
 >>> df.to_file('stats.shp')
 >>> df.to_csv('stats.csv')
 ```
+
+### Testing
+
+```python
+>>> import zones
+>>> zones.test_01()
+```
+
+... should result in `If there were no assertion errors, the tests ran OK.`
+

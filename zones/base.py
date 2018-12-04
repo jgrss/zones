@@ -1,3 +1,5 @@
+from future.utils import viewitems
+
 import os
 
 from .errors import logger, ValuesFileError, StatsError, ZonesFileError
@@ -56,7 +58,7 @@ class ZonesBase(object):
 
         proj4 = ''
 
-        for k, v in self.zones_df.crs.iteritems():
+        for k, v in viewitems(self.zones_df.crs):
             proj4 += '+{}={} '.format(k, v)
 
         return proj4[:-1]
