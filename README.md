@@ -16,7 +16,7 @@ also be added.
 ```python
 >>> import zones
 >>>
->>> zs = zones.RasterStats('values.tif', 'zones.shp')
+>>> zs = zones.RasterStats('values.tif', 'zones.shp', verbose=2)
 >>>
 >>> # One statistic
 >>> df = zs.calculate(['mean'])
