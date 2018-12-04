@@ -1,4 +1,3 @@
-import os
 import logging
 
 _FORMAT = '%(asctime)s:%(levelname)s:%(lineno)s:%(module)s.%(funcName)s:%(message)s'

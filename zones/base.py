@@ -3,9 +3,8 @@ import os
 from .errors import logger, ValuesFileError, StatsError, ZonesFileError
 from .stats import STAT_DICT
 
-import mpglight.raster_tools as gl
+import mpglue as gl
 
-import numpy as np
 import pandas as pd
 import geopandas as gpd
 

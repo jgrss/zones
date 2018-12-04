@@ -2,7 +2,7 @@ from .base import ZonesBase
 from .errors import logger
 from .stats import STAT_DICT
 
-from mpglight import raster_tools
+from mpglue import raster_tools
 
 import numpy as np
 from osgeo import gdal, ogr, osr
@@ -160,15 +160,15 @@ class RasterStats(ZonesBase):
                                     #d_type='float32')
 
         src = raster_tools.warp(image_name,
-                                              'temp.mem',
-                                              format='MEM',
-                                              out_proj=proj4,
-                                              multithread=True,
-                                              outputBounds=[left, top-(ycount*image_src.cellY), left+(xcount*image_src.cellY), top],
-                                              cell_size=image_src.cellY,
-                                              d_type='float32',
-                                              return_datasource=True,
-                                              warpMemoryLimit=256)
+                                'temp.mem',
+                                format='MEM',
+                                out_proj=proj4,
+                                multithread=True,
+                                outputBounds=[left, top-(ycount*image_src.cellY), left+(xcount*image_src.cellY), top],
+                                cell_size=image_src.cellY,
+                                d_type='float32',
+                                return_datasource=True,
+                                warpMemoryLimit=256)
 
         image_array = src.read(bands2open=-1)
 
