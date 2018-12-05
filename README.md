@@ -47,7 +47,7 @@ also be added.
 
 ```python
 >>> import zones
->>> zones.test_01()
+>>> zones.test_raster()
 ```
 
 ... should result in `If there were no assertion errors, the tests ran OK.`

@@ -1,19 +1,19 @@
 # import unittest
 
 from ..errors import logger
-from ..datasets import load_01_single
+from ..datasets import load_01_multi
 from .. import RasterStats
 
 import numpy as np
 
 
-def test_01_single():
+def test_01_multi():
 
     feat01 = np.array([318, 385, 429, 346, 462, 492, 484, 495, 517, 498, 533, 498], dtype='int64')
     feat02 = np.array([419, 434, 334, 528, 392, 387, 439, 392, 489, 474, 451, 404], dtype='int64')
     feat03 = np.array([398, 283, 349, 436, 346, 493, 398, 398, 377, 472, 461, 453], dtype='int64')
 
-    raster, vector = load_01_single()
+    raster, vector = load_01_multi()
     zs = RasterStats(raster, vector, verbose=0)
     df = zs.calculate(['sum', 'mean'])
 

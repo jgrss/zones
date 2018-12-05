@@ -65,21 +65,59 @@ class ZonesBase(object):
 
     def _prepare_zones(self, unique_column):
 
+        if self.values_src:
+            self.n_bands = self.values_src.bands
+        else:
+            self.n_bands = 0
+
         # TODO
         if isinstance(unique_column, str):
             return None
         else:
 
             zone_values = dict()
-            for idx, dfr in self.zones_df.iterrows():
-                zone_values[idx] = [0.0] * len(self.stats)
+
+            if self.n_bands > 0:
+
+                for bidx in range(1, self.n_bands+1):
+
+                    zone_values[bidx] = dict()
+
+                    for idx, dfr in self.zones_df.iterrows():
+                        zone_values[bidx][idx] = [0.0] * len(self.stats)
+
+            else:
+
+                for idx, dfr in self.zones_df.iterrows():
+                    zone_values[idx] = [0.0] * len(self.stats)
 
             return zone_values
 
     def _finalize_dataframe(self):
 
-        values_df = pd.DataFrame.from_dict(self.zone_values, orient='index')
-        values_df.columns = self.stats
+        if hasattr(self, 'band'):
+
+            if isinstance(self.band, int):
+
+                values_df = pd.DataFrame.from_dict(self.zone_values[self.band], orient='index')
+                values_df.columns = ('_bd{:d},'.format(self.band).join(self.stats) + '_bd{:d}'.format(self.band)).split(',')
+
+            else:
+
+                for bidx in range(1, self.n_bands+1):
+
+                    values_df_ = pd.DataFrame.from_dict(self.zone_values[bidx], orient='index')
+                    values_df_.columns = ('_bd{:d},'.format(bidx).join(self.stats) + '_bd{:d}'.format(bidx)).split(',')
+
+                    if bidx == 1:
+                        values_df = values_df_.copy()
+                    else:
+                        values_df = pd.concat((values_df, values_df_), axis=1)
+
+        else:
+
+            values_df = pd.DataFrame.from_dict(self.zone_values, orient='index')
+            values_df.columns = self.stats
 
         return pd.merge(self.zones_df, values_df, left_index=True, right_index=True)
 

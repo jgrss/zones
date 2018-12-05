@@ -1,3 +1,3 @@
-from .data import load_01
+from .data import load_01_single, load_01_multi
 
-__all__ = ['load_01']
+__all__ = ['load_01_single', 'load_01_multi']

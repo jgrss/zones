@@ -1,6 +1,6 @@
 from .point_stats import PointStats
 from .raster_stats import RasterStats
-from .testing.test_single_band import test_01
+from .testing.test import test_raster
 from .version import __version__
 
-__all__ = ['PointStats', 'RasterStats', 'test_01', '__version__']
+__all__ = ['PointStats', 'RasterStats', 'test_raster', '__version__']

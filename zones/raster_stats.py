@@ -17,6 +17,9 @@ class RasterStats(ZonesBase):
         values (str): The raster values file. Can be float or categorical raster.
         zones (str): The zones file. It should be a polygon vector file.
         unique_column (Optional[str]): A unique column identifier. Default is None.
+        no_data (Optional[int or float]): A no data value to mask. Default is 0.
+        band (Optional[int]): The band to calculate (if multi-band). Default is None, or calculate all bands.
+        verbose (Optional[int]): The verbosity level. Default is 0.
 
     Examples:
         >>> import zones
@@ -27,11 +30,13 @@ class RasterStats(ZonesBase):
         >>> df.to_csv('stats.csv')
     """
 
-    def __init__(self, values, zones, unique_column=None, verbose=0):
+    def __init__(self, values, zones, unique_column=None, no_data=0, band=None, verbose=0):
 
         self.values = values
         self.zones = zones
         self.unique_column = unique_column
+        self.no_data = no_data
+        self.band = band
         self.verbose = verbose
 
         self.stats = None
@@ -61,21 +66,45 @@ class RasterStats(ZonesBase):
             null_idx = np.where(poly_array == 0)
 
             if null_idx[0].size > 0:
-                image_array[null_idx] = 0
+                image_array[null_idx] = self.no_data
 
             if any(['nan' in x for x in stats]):
 
-                no_data_idx = np.where(image_array == 0)
+                no_data_idx = np.where(image_array == self.no_data)
 
                 if no_data_idx[0].size > 0:
                     image_array[no_data_idx] = np.nan
 
-            for sidx, stat in enumerate(stats):
+            if len(image_array.shape) == 2:
 
-                stat_func = STAT_DICT[stat]
+                for sidx, stat in enumerate(stats):
 
-                # TODO: if zones are not unique
-                self.zone_values[didx][sidx] = stat_func(image_array)
+                    stat_func = STAT_DICT[stat]
+
+                    # TODO: if zones are not unique
+                    self.zone_values[1][didx][sidx] = stat_func(image_array)
+
+            else:
+
+                if isinstance(self.band, int):
+
+                    for sidx, stat in enumerate(stats):
+
+                        stat_func = STAT_DICT[stat]
+
+                        # TODO: if zones are not unique
+                        self.zone_values[self.band][didx][sidx] = stat_func(image_array[self.band-1])
+
+                else:
+
+                    for bidx in range(1, self.values_src.bands+1):
+
+                        for sidx, stat in enumerate(stats):
+
+                            stat_func = STAT_DICT[stat]
+
+                            # TODO: if zones are not unique
+                            self.zone_values[bidx][didx][sidx] = stat_func(image_array[bidx-1])
 
     @staticmethod
     def _rasterize(geom, proj4, image_src, image_name):
