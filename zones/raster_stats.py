@@ -4,10 +4,12 @@ from .base import ZonesBase
 from .errors import logger
 from .stats import STAT_DICT
 
-from mpglue import raster_tools, vector_tools
+from mpglue import raster_tools
 
 import numpy as np
 from osgeo import gdal, ogr, osr
+
+from tqdm import tqdm
 
 
 class RasterStats(ZonesBase):
@@ -48,7 +50,7 @@ class RasterStats(ZonesBase):
 
         n = self.zones_df.shape[0]
 
-        for didx, df_row in self.zones_df.iterrows():
+        for didx, df_row in tqdm(self.zones_df.iterrows(), leave=False):
 
             if self.verbose > 1:
                 logger.info('    Zone {:,d} of {:,d} ...'.format(didx+1, n))
@@ -58,22 +60,21 @@ class RasterStats(ZonesBase):
             # Rasterize the data
             poly_array, image_array = self._rasterize(geom, proj4, self.values_src, self.values)
 
-            # TODO: multi-band images
-            # TODO: return empty stat
-            #if poly_array.shape != image_array.shape:
-                #continue
+            if not isinstance(poly_array, np.ndarray):
+                image_array = np.array([0], dtype='float32')
+            else:
 
-            null_idx = np.where(poly_array == 0)
+                null_idx = np.where(poly_array == 0)
 
-            if null_idx[0].size > 0:
-                image_array[null_idx] = self.no_data
+                if null_idx[0].size > 0:
+                    image_array[null_idx] = self.no_data
 
-            if any(['nan' in x for x in stats]):
+                if any(['nan' in x for x in stats]):
 
-                no_data_idx = np.where(image_array == self.no_data)
+                    no_data_idx = np.where(image_array == self.no_data)
 
-                if no_data_idx[0].size > 0:
-                    image_array[no_data_idx] = np.nan
+                    if no_data_idx[0].size > 0:
+                        image_array[no_data_idx] = np.nan
 
             if len(image_array.shape) == 2:
 
@@ -145,7 +146,10 @@ class RasterStats(ZonesBase):
         ycount = int(round((top - bottom) / image_src.cellY))
 
         # Create a raster to rasterize into.
-        target_ds = gdal.GetDriverByName('MEM').Create('', xcount, ycount, 1, gdal.GDT_Byte)
+        try:
+            target_ds = gdal.GetDriverByName('MEM').Create('', xcount, ycount, 1, gdal.GDT_Byte)
+        except:
+            return None, None
 
         target_ds.SetGeoTransform([left, image_src.cellY, 0., top, 0., -image_src.cellY])
         target_ds.SetProjection(target_sr.ExportToWkt())
