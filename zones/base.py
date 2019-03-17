@@ -27,12 +27,12 @@ class ZonesBase(object):
             DataFrame
         """
 
-        self._check_arguments(stats)
-
         self.stats = stats
 
         if isinstance(self.stats, str):
             self.stats = [self.stats]
+
+        self._check_arguments(self.stats)
 
         if self.verbose > 0:
             logger.info('  Preparing files ...')

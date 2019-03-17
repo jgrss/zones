@@ -126,9 +126,16 @@ class PointStats(ZonesBase):
             self.values_df = self.values_df.query(self.query)
 
         if isinstance(self.point_proj, str):
-            self.values_df = self.values_df.to_crs(self.point_proj)
+            self.values_df.crs = self.point_proj
+
+        if self.verbose > 0:
+            logger.info('  Transforming value DataFrame CRS ...')
 
         self.values_df = self.values_df.to_crs(self.zones_df.crs)
+
+        if self.verbose > 0:
+            logger.info('  Setting up spatial index ...')
+
         self.point_index = self.values_df.sindex
 
     def _iter(self, stats):
@@ -139,8 +146,8 @@ class PointStats(ZonesBase):
 
         for didx, df_row in tqdm(self.zones_df.iterrows(), leave=False):
 
-            if self.verbose > 1:
-                logger.info('    Zone {:,d} of {:,d} ...'.format(didx + 1, n))
+            # if self.verbose > 1:
+            #     logger.info('    Zone {:,d} of {:,d} ...'.format(didx + 1, n))
 
             geom = df_row.geometry
 
@@ -153,12 +160,16 @@ class PointStats(ZonesBase):
                 # Get a subset of the DataFrame.
                 point_df = self.values_df.iloc[int_points]
 
-                # Take points within the zone
-                # point_list = [point_idx for point_idx, point_row in point_df.iterrows()
-                #               if geom.contains(point_row.geometry)]
+                if point_df.iloc[0].geometry.type.lower() == 'polygon':
 
-                # Get the real subset of points.
-                # point_df = self.values_df.iloc[point_list]
+                    point_df['geometry'] = point_df.geometry.centroid
+
+                    # Take points within the zone
+                    point_list = [point_idx for point_idx, point_row in point_df.iterrows()
+                                  if geom.contains(point_row.geometry)]
+
+                    # Get the real subset of points.
+                    point_df = self.values_df.loc[point_list]
 
                 for sidx, stat in enumerate(stats):
 
@@ -172,3 +183,10 @@ class PointStats(ZonesBase):
                         stat_func = STAT_DICT[stat]
 
                         self.zone_values[didx][sidx] = stat_func(point_df[self.value_column].values)
+
+            else:
+
+                for sidx, stat in enumerate(stats):
+
+                    if stat == 'dist':
+                        self.zone_values[didx] = ''
