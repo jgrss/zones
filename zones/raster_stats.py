@@ -20,6 +20,7 @@ class RasterStats(ZonesBase):
         zones (str): The zones file. It should be a polygon vector file.
         unique_column (Optional[str]): A unique column identifier. Default is None.
         no_data (Optional[int or float]): A no data value to mask. Default is 0.
+        raster_value (Optional[int or list]): A raster value to get statistics for. Default is None.
         band (Optional[int]): The band to calculate (if multi-band). Default is None, or calculate all bands.
         verbose (Optional[int]): The verbosity level. Default is 0.
 
@@ -32,12 +33,20 @@ class RasterStats(ZonesBase):
         >>> df.to_csv('stats.csv')
     """
 
-    def __init__(self, values, zones, unique_column=None, no_data=0, band=None, verbose=0):
+    def __init__(self,
+                 values,
+                 zones,
+                 unique_column=None,
+                 no_data=0,
+                 raster_value=None,
+                 band=None,
+                 verbose=0):
 
         self.values = values
         self.zones = zones
         self.unique_column = unique_column
         self.no_data = no_data
+        self.raster_value = raster_value
         self.band = band
         self.verbose = verbose
 
@@ -59,6 +68,25 @@ class RasterStats(ZonesBase):
 
             # Rasterize the data
             poly_array, image_array = self._rasterize(geom, proj4, self.values_src, self.values)
+
+            if isinstance(self.raster_value, int):
+
+                image_array = np.where(image_array == self.raster_value, 1, 0)
+
+                if image_array.max() == 0:
+                    continue
+
+            elif isinstance(self.raster_value, list):
+
+                image_array_ = np.zeros(image_array.shape, dtype='uint8')
+
+                for raster_value_ in self.raster_value:
+                    image_array_ = np.where(image_array == raster_value_, 1, image_array_)
+
+                image_array = image_array_
+
+                if image_array.max() == 0:
+                    continue
 
             if not isinstance(poly_array, np.ndarray):
                 image_array = np.array([0], dtype='float32')

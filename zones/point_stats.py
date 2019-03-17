@@ -2,10 +2,11 @@ from .base import ZonesBase
 from .errors import logger
 from .stats import STAT_DICT
 
-import numpy as np
 import pandas as pd
 import geopandas as gpd
 import shapely
+
+from tqdm import tqdm
 
 shapely.speedups.enable()
 
@@ -16,21 +17,33 @@ class PointStats(ZonesBase):
     Args:
         values (str): The points values file. It can be a .csv or point shapefile.
         zones (str): The zones file. It should be a polygon vector file.
+        value_column (str): The column in `values` to calculate statistics from.
+        query (Optional[str]): A query expression to subset the values DataFrame by. Default is None.
         unique_column (Optional[str]): A unique column identifier. Default is None.
+        x_column (str): TODO
+        y_column (str): TODO
+        verbose (Optional[int]): The verbosity level. Default is 0.
 
     Examples:
         >>> import zones
-        >>> zs = zones.PointStats('values.csv', 'zones.shp')
+        >>>
+        >>> zs = zones.PointStats('values.csv', 'zones.shp', 'field_name')
         >>> df = zs.calculate(['mean'])
         >>> df = zs.calculate(['nanmean', 'nansum'])
         >>> df.to_file('stats.shp')
         >>> df.to_csv('stats.csv')
+        >>>
+        >>> # Calculate the point mean where DN is equal to 1.
+        >>> zs = zones.PointStats('values.csv', 'zones.shp', 'field_name', query="DN == 1")
+        >>> df = zs.calculate(['mean'])
     """
 
-    def __init__(self, values, zones, unique_column=None, x_column='X', y_column='Y', verbose=0):
+    def __init__(self, values, zones, value_column, query=None, unique_column=None, x_column='X', y_column='Y', verbose=0):
 
         self.values = values
         self.zones = zones
+        self.value_column = value_column
+        self.query = query
         self.unique_column = unique_column
         self.x_column = x_column
         self.y_column = y_column
@@ -96,11 +109,21 @@ class PointStats(ZonesBase):
 
         self.point_index = self.point_df.sindex
 
+    def _prepare_values(self):
+
+        if isinstance(self.query, str):
+            self.values_df = self.values_df.query(self.query)
+
+        self.values_df = self.values_df.to_crs(self.zones_df.crs)
+        self.point_index = self.values_df.sindex
+
     def _iter(self, stats):
+
+        self._prepare_values()
 
         n = self.zones_df.shape[0]
 
-        for didx, df_row in self.zones_df.iterrows():
+        for didx, df_row in tqdm(self.zones_df.iterrows(), leave=False):
 
             if self.verbose > 1:
                 logger.info('    Zone {:,d} of {:,d} ...'.format(didx + 1, n))
@@ -117,28 +140,14 @@ class PointStats(ZonesBase):
                 point_df = self.values_df.iloc[int_points]
 
                 # Take points within the zone
-                point_list = [point_idx for point_idx, point_row in point_df.iterrows()
-                              if geom.contains(point_row.geometry)]
+                # point_list = [point_idx for point_idx, point_row in point_df.iterrows()
+                #               if geom.contains(point_row.geometry)]
 
                 # Get the real subset of points.
-                point_df = self.values_df.iloc[point_list]
+                # point_df = self.values_df.iloc[point_list]
 
                 for sidx, stat in enumerate(stats):
 
                     stat_func = STAT_DICT[stat]
 
-                    # TODO: if zones are not unique
-                    # self.zone_values[didx][sidx] = stat_func(image_array)
-
-                    # TODO
-                    # Calculate statistics.
-                    zone_values = point_df[value_columns].apply(stat_func).values
-
-                if not isinstance(stat_array, np.ndarray):
-                    stat_array = zone_values.copy()
-                else:
-                    stat_array = np.vstack((stat_array, zone_values))
-
-                index_values.append(df_idx)
-
-        self.stat_df.loc[index_values, value_columns] = stat_array
+                    self.zone_values[didx][sidx] = stat_func(point_df[self.value_column])

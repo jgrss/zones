@@ -7,7 +7,7 @@ scale with the size of the vector polygons.
 
 ### Planned support
 
-Currently, polygon zones are supported, but support for point data will 
+Currently, vector points are supported for `PointStats`, but support for tabular x,y data will 
 also be added.
 
 
@@ -29,18 +29,23 @@ also be added.
 >>> df.to_csv('stats.csv')
 ```
 
-### Zonal stats with polygon and point data (stored in a CSV file)
+### Zonal stats with polygon and vector point data
 
 ```python
 >>> import zones
 >>>
->>> zs = zones.PointStats('values.csv', 'zones.shp', x_column='X', y_column='Y', verbose=2)
+>>> zs = zones.PointStats('points.shp', 'zones.shp', 'field_name')
 >>>
 >>> df = zs.calculate(['nanmean', 'nansum'])
 >>>
 >>> # Save data to file
 >>> df.to_file('stats.shp')
 >>> df.to_csv('stats.csv')
+>>>
+>>> # Calculate the point mean where DN is equal to 1.
+>>> zs = zones.PointStats('points.shp', 'zones.shp', 'field_name', query="DN == 1")
+>>> df = zs.calculate(['mean'])
+
 ```
 
 ### Testing
