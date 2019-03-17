@@ -22,6 +22,7 @@ class PointStats(ZonesBase):
         unique_column (Optional[str]): A unique column identifier. Default is None.
         x_column (str): TODO
         y_column (str): TODO
+        point_proj (Optional[str]): The point projection string. Default is None.
         verbose (Optional[int]): The verbosity level. Default is 0.
 
     Examples:
@@ -38,7 +39,16 @@ class PointStats(ZonesBase):
         >>> df = zs.calculate(['mean'])
     """
 
-    def __init__(self, values, zones, value_column, query=None, unique_column=None, x_column='X', y_column='Y', verbose=0):
+    def __init__(self,
+                 values,
+                 zones,
+                 value_column,
+                 query=None,
+                 unique_column=None,
+                 x_column='X',
+                 y_column='Y',
+                 point_proj=None,
+                 verbose=0):
 
         self.values = values
         self.zones = zones
@@ -47,6 +57,7 @@ class PointStats(ZonesBase):
         self.unique_column = unique_column
         self.x_column = x_column
         self.y_column = y_column
+        self.point_proj = point_proj
         self.verbose = verbose
 
         self.stats = None
@@ -114,6 +125,9 @@ class PointStats(ZonesBase):
         if isinstance(self.query, str):
             self.values_df = self.values_df.query(self.query)
 
+        if isinstance(self.point_proj, str):
+            self.values_df = self.values_df.to_crs(self.point_proj)
+
         self.values_df = self.values_df.to_crs(self.zones_df.crs)
         self.point_index = self.values_df.sindex
 
@@ -148,6 +162,13 @@ class PointStats(ZonesBase):
 
                 for sidx, stat in enumerate(stats):
 
-                    stat_func = STAT_DICT[stat]
+                    if stat == 'dist':
 
-                    self.zone_values[didx][sidx] = stat_func(point_df[self.value_column])
+                        self.zone_values[didx] = ';'.join(list(map('{:.4f}'.format,
+                                                                   point_df[self.value_column].values.tolist())))
+
+                    else:
+
+                        stat_func = STAT_DICT[stat]
+
+                        self.zone_values[didx][sidx] = stat_func(point_df[self.value_column].values)

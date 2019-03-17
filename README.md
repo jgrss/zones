@@ -19,7 +19,7 @@ also be added.
 >>> zs = zones.RasterStats('values.tif', 'zones.shp', verbose=2)
 >>>
 >>> # One statistic
->>> df = zs.calculate(['mean'])
+>>> df = zs.calculate('mean')
 >>>
 >>> # Multiple statistics
 >>> df = zs.calculate(['nanmean', 'nansum'])
@@ -44,8 +44,17 @@ also be added.
 >>>
 >>> # Calculate the point mean where DN is equal to 1.
 >>> zs = zones.PointStats('points.shp', 'zones.shp', 'field_name', query="DN == 1")
->>> df = zs.calculate(['mean'])
+>>> df = zs.calculate('mean')
+```
 
+### Other methods
+
+```python
+>>> # Get available stats
+>>> print(zs.stats_avail)
+>>>
+>>> # To store the data as a distribution, use 'dist'.
+>>> df = zs.calculate('dist')
 ```
 
 ### Testing

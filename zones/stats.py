@@ -14,4 +14,5 @@ STAT_DICT = dict(mean=np.mean,
                  min=np.min,
                  nanmin=np.nanmin,
                  max=np.max,
-                 nanmax=np.nanmax)
+                 nanmax=np.nanmax,
+                 dist=None)

@@ -10,10 +10,12 @@ import mpglue as gl
 import pandas as pd
 import geopandas as gpd
 
-from tqdm import trange, tqdm
-
 
 class ZonesBase(object):
+
+    @property
+    def stats_avail(self):
+        return list(STAT_DICT.keys())
 
     def calculate(self, stats):
 
@@ -28,6 +30,9 @@ class ZonesBase(object):
         self._check_arguments(stats)
 
         self.stats = stats
+
+        if isinstance(self.stats, str):
+            self.stats = [self.stats]
 
         if self.verbose > 0:
             logger.info('  Preparing files ...')
@@ -85,12 +90,12 @@ class ZonesBase(object):
 
                     zone_values[bidx] = dict()
 
-                    for idx, dfr in tqdm(self.zones_df.iterrows(), leave=False):
+                    for idx, dfr in self.zones_df.iterrows():
                         zone_values[bidx][idx] = [0.0] * len(self.stats)
 
             else:
 
-                for idx, dfr in tqdm(self.zones_df.iterrows(), leave=False):
+                for idx, dfr in self.zones_df.iterrows():
                     zone_values[idx] = [0.0] * len(self.stats)
 
             return zone_values
@@ -106,7 +111,7 @@ class ZonesBase(object):
 
             else:
 
-                for bidx in trange(1, self.n_bands+1):
+                for bidx in range(1, self.n_bands+1):
 
                     values_df_ = pd.DataFrame.from_dict(self.zone_values[bidx], orient='index')
                     values_df_.columns = ('_bd{:d},'.format(bidx).join(self.stats) + '_bd{:d}'.format(bidx)).split(',')
