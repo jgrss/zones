@@ -6,9 +6,54 @@ import pandas as pd
 import geopandas as gpd
 import shapely
 
+from joblib import Parallel, delayed
 from tqdm import tqdm
 
 shapely.speedups.enable()
+
+
+def worker(didx, df_row, stat, value_column):
+
+    geom = df_row.geometry
+
+    # Get points that intersect the
+    #   (square) bounds of the zone.
+    int_points = sorted(list(point_index_g.intersection(geom.bounds)))
+
+    if int_points:
+
+        # Get a subset of the DataFrame.
+        point_df = values_df_g.iloc[int_points]
+
+        if point_df.iloc[0].geometry.type.lower() == 'polygon':
+            point_df['geometry'] = point_df.geometry.centroid
+
+            # Take points within the zone
+            point_list = [point_idx for point_idx, point_row in point_df.iterrows()
+                          if geom.contains(point_row.geometry)]
+
+            # Get the real subset of points.
+            point_df = values_df_g.loc[point_list]
+
+        if stat == 'dist':
+
+            values = ';'.join(list(map('{:.4f}'.format,
+                                       point_df[value_column].values.tolist())))
+
+        else:
+
+            stat_func = STAT_DICT[stat]
+
+            values = stat_func(point_df[value_column].values)
+
+    else:
+
+        if stat == 'dist':
+            values = ''
+        else:
+            values = 0.0
+
+    return didx, values
 
 
 class PointStats(ZonesBase):
@@ -24,19 +69,25 @@ class PointStats(ZonesBase):
         y_column (str): TODO
         point_proj (Optional[str]): The point projection string. Default is None.
         verbose (Optional[int]): The verbosity level. Default is 0.
+        n_jobs (Optional[int]): The number of parallel processes (zones). Default is 1.
+            *Currently, this only works with one statistic.
 
     Examples:
         >>> import zones
         >>>
-        >>> zs = zones.PointStats('values.csv', 'zones.shp', 'field_name')
-        >>> df = zs.calculate(['mean'])
+        >>> zs = zones.PointStats('points.shp', 'zones.shp', 'field_name')
+        >>> df = zs.calculate('mean')
         >>> df = zs.calculate(['nanmean', 'nansum'])
         >>> df.to_file('stats.shp')
         >>> df.to_csv('stats.csv')
         >>>
         >>> # Calculate the point mean where DN is equal to 1.
-        >>> zs = zones.PointStats('values.csv', 'zones.shp', 'field_name', query="DN == 1")
-        >>> df = zs.calculate(['mean'])
+        >>> zs = zones.PointStats('points.shp', 'zones.shp', 'field_name', query="DN == 1")
+        >>> df = zs.calculate('mean')
+        >>>
+        >>> # Calculate one statistic in parallel (over zones)
+        >>> zs = zones.PointStats('points.shp', 'zones.shp', 'field_name', n_jobs=-1)
+        >>> df = zs.calculate('mean')
     """
 
     def __init__(self,
@@ -48,7 +99,8 @@ class PointStats(ZonesBase):
                  x_column='X',
                  y_column='Y',
                  point_proj=None,
-                 verbose=0):
+                 verbose=0,
+                 n_jobs=1):
 
         self.values = values
         self.zones = zones
@@ -59,6 +111,7 @@ class PointStats(ZonesBase):
         self.y_column = y_column
         self.point_proj = point_proj
         self.verbose = verbose
+        self.n_jobs = n_jobs
 
         self.stats = None
         self.zone_values = None
@@ -140,53 +193,68 @@ class PointStats(ZonesBase):
 
     def _iter(self, stats):
 
+        global point_index_g, values_df_g
+
+        point_index_g = None
+        values_df_g = None
+
         self._prepare_values()
 
-        n = self.zones_df.shape[0]
+        if (self.n_jobs != 1) and (len(self.stats) == 1):
 
-        for didx, df_row in tqdm(self.zones_df.iterrows(), leave=False):
+            point_index_g = self.point_index
+            values_df_g = self.values_df
 
-            # if self.verbose > 1:
-            #     logger.info('    Zone {:,d} of {:,d} ...'.format(didx + 1, n))
+            results = Parallel(n_jobs=self.n_jobs)(delayed(worker)(didx, dfrow, stats[0], self.value_column)
+                                                   for didx, dfrow in self.zones_df.iterrows())
 
-            geom = df_row.geometry
+            self.values_df = dict(results)
 
-            # Get points that intersect the
-            #   (square) bounds of the zone.
-            int_points = sorted(list(self.point_index.intersection(geom.bounds)))
+        else:
 
-            if int_points:
+            for didx, df_row in tqdm(self.zones_df.iterrows(), leave=False):
 
-                # Get a subset of the DataFrame.
-                point_df = self.values_df.iloc[int_points]
+                # if self.verbose > 1:
+                #     logger.info('    Zone {:,d} of {:,d} ...'.format(didx + 1, n))
 
-                if point_df.iloc[0].geometry.type.lower() == 'polygon':
+                geom = df_row.geometry
 
-                    point_df['geometry'] = point_df.geometry.centroid
+                # Get points that intersect the
+                #   (square) bounds of the zone.
+                int_points = sorted(list(self.point_index.intersection(geom.bounds)))
 
-                    # Take points within the zone
-                    point_list = [point_idx for point_idx, point_row in point_df.iterrows()
-                                  if geom.contains(point_row.geometry)]
+                if int_points:
 
-                    # Get the real subset of points.
-                    point_df = self.values_df.loc[point_list]
+                    # Get a subset of the DataFrame.
+                    point_df = self.values_df.iloc[int_points]
 
-                for sidx, stat in enumerate(stats):
+                    if point_df.iloc[0].geometry.type.lower() == 'polygon':
 
-                    if stat == 'dist':
+                        point_df['geometry'] = point_df.geometry.centroid
 
-                        self.zone_values[didx] = ';'.join(list(map('{:.4f}'.format,
-                                                                   point_df[self.value_column].values.tolist())))
+                        # Take points within the zone
+                        point_list = [point_idx for point_idx, point_row in point_df.iterrows()
+                                      if geom.contains(point_row.geometry)]
 
-                    else:
+                        # Get the real subset of points.
+                        point_df = self.values_df.loc[point_list]
 
-                        stat_func = STAT_DICT[stat]
+                    for sidx, stat in enumerate(stats):
 
-                        self.zone_values[didx][sidx] = stat_func(point_df[self.value_column].values)
+                        if stat == 'dist':
 
-            else:
+                            self.zone_values[didx] = ';'.join(list(map('{:.4f}'.format,
+                                                                       point_df[self.value_column].values.tolist())))
 
-                for sidx, stat in enumerate(stats):
+                        else:
 
-                    if stat == 'dist':
-                        self.zone_values[didx] = ''
+                            stat_func = STAT_DICT[stat]
+
+                            self.zone_values[didx][sidx] = stat_func(point_df[self.value_column].values)
+
+                else:
+
+                    for sidx, stat in enumerate(stats):
+
+                        if stat == 'dist':
+                            self.zone_values[didx] = ''
