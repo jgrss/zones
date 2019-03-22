@@ -29,14 +29,15 @@ also be added.
 >>> df.to_csv('stats.csv')
 ```
 
-#### The zone data can also be a `GeoDataFrame`.
+#### The zone data can also be a `GeoDataFrame` or any other vector format supported by `GDAL`.
 
 ```python
 >>> import geopandas as gpd
 >>>
 >>> gdf = gpd.read_file('data.shp')
 >>>
->>> zs = zones.RasterStats('values.tif', gdf, verbose=2)
+>>> zs = zones.RasterStats('values.tif', gdf)
+>>> zs = zones.RasterStats('values.tif', 'zones.gpkg')
 ```
 
 ### Zonal stats with polygon and vector point data
