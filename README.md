@@ -29,7 +29,7 @@ also be added.
 >>> df.to_csv('stats.csv')
 ```
 
-#### The zone data can also be a `GeoDataFrame` or any other vector format supported by `GDAL`.
+#### The zone data can also be a `GeoDataFrame` or any other vector format supported by `GeoPandas`.
 
 ```python
 >>> import geopandas as gpd
