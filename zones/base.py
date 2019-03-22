@@ -11,7 +11,7 @@ import pandas as pd
 import geopandas as gpd
 
 
-class ZonesBase(object):
+class ZonesMixin(object):
 
     @property
     def stats_avail(self):
@@ -32,45 +32,72 @@ class ZonesBase(object):
         if isinstance(self.stats, str):
             self.stats = [self.stats]
 
-        self._check_arguments(self.stats)
+        self.check_arguments(self.stats)
 
         if self.verbose > 0:
             logger.info('  Preparing files ...')
 
-        self._prepare_files(self.zones, self.values)
+        self.prepare_files(self.zones, self.values)
 
         if self.verbose > 0:
             logger.info('  Preparing zones ...')
 
-        self.zone_values = self._prepare_zones(self.unique_column)
+        self.zone_values = self.prepare_zones(self.unique_column)
 
         if self.verbose > 0:
             logger.info('  Calculating stats ...')
 
-        self._iter(self.stats)
+        self.zone_iter(self.stats)
 
         if self.verbose > 0:
             logger.info('  Finalizing data ...')
 
         self._close_files()
 
-        return self._finalize_dataframe()
+        return self.finalize_dataframe()
 
-    def _prepare_files(self, zones, values):
+    def check_if_geodf(self, data_file):
+
+        """
+        Checks for file data type
+
+        Args:
+            data_file
+
+        Returns:
+            data_file (GeoDataFrame)
+        """
+
+        if isinstance(data_file, gpd.GeoDataFrame):
+            return data_file, None
+        else:
+
+            file_extension = os.path.splitext(os.path.split(data_file)[1])[1].lower().strip()
+
+            if file_extension in ['.shp', '.gpkg']:
+                return gpd.read_file(data_file), None
+            elif file_extension == '.csv':
+                return pd.read_csv(data_file), None
+            else:
+                return None, gl.ropen(data_file)
+
+    def prepare_files(self, zones, values):
+
+        """
+        Prepares files
+
+        Args:
+            zones
+            values
+        """
 
         self.values_df = None
         self.values_src = None
 
-        self.zones_df = gpd.read_file(zones)
+        self.zones_df = self.check_if_geodf(zones)[0]
+        self.values_df, self.values_src = self.check_if_geodf(values)
 
-        if self.values.lower().endswith('.shp'):
-            self.values_df = gpd.read_file(values)
-        elif self.values.lower().endswith('.csv'):
-            self.values_df = pd.read_csv(values)
-        else:
-            self.values_src = gl.ropen(values)
-
-    def _prepare_zones(self, unique_column):
+    def prepare_zones(self, unique_column):
 
         if self.values_src:
             self.n_bands = self.values_src.bands
@@ -100,7 +127,7 @@ class ZonesBase(object):
 
             return zone_values
 
-    def _finalize_dataframe(self):
+    def finalize_dataframe(self):
 
         if hasattr(self, 'band'):
 
@@ -144,7 +171,7 @@ class ZonesBase(object):
 
         return proj4[:-1]
 
-    def _check_arguments(self, stats):
+    def check_arguments(self, stats):
 
         """
         Args:

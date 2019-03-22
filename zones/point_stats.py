@@ -1,4 +1,4 @@
-from .base import ZonesBase
+from .base import ZonesMixin
 from .errors import logger
 from .stats import STAT_DICT
 
@@ -14,6 +14,10 @@ shapely.speedups.enable()
 
 def worker(didx, df_row, stat, value_column):
 
+    """
+    The parallel worker function
+    """
+
     geom = df_row.geometry
 
     # Get points that intersect the
@@ -26,6 +30,7 @@ def worker(didx, df_row, stat, value_column):
         point_df = values_df_g.iloc[int_points]
 
         if point_df.iloc[0].geometry.type.lower() == 'polygon':
+
             point_df['geometry'] = point_df.geometry.centroid
 
             # Take points within the zone
@@ -56,17 +61,26 @@ def worker(didx, df_row, stat, value_column):
     return didx, values
 
 
-class PointStats(ZonesBase):
+class PointStats(ZonesMixin):
 
     """
     Args:
-        values (str): The points values file. It can be a .csv or point shapefile.
-        zones (str): The zones file. It should be a polygon vector file.
+        values (str or GeoDataFrame): The points values file.
+            Accepted types are:
+                str: vector file (e.g., shapefile, or geopackage)
+                str: CSV file (must have an X and Y column)
+                GeoDataFrame: the geometry type must be `Point`
+        zones (str or GeoDataFrame): The zones file.
+            Accepted types are:
+                str: vector file (e.g., shapefile, or geopackage)
+                GeoDataFrame: the geometry type must be `Polygon`
         value_column (str): The column in `values` to calculate statistics from.
         query (Optional[str]): A query expression to subset the values DataFrame by. Default is None.
-        unique_column (Optional[str]): A unique column identifier. Default is None.
-        x_column (str): TODO
-        y_column (str): TODO
+        unique_column (Optional[str]): A unique column identifier for `zones`.
+            Default is None, which treats all zones as unique and uses the
+            highest (resolution) level geometry.
+        x_column (str): The X column name for `values` when type is CSV. Default is 'X'.
+        y_column (str): The Y column name for `values` when type is CSV. Default is 'Y'.
         point_proj (Optional[str]): The point projection string. Default is None.
         verbose (Optional[int]): The verbosity level. Default is 0.
         n_jobs (Optional[int]): The number of parallel processes (zones). Default is 1.
@@ -117,10 +131,10 @@ class PointStats(ZonesBase):
         self.zone_values = None
 
     @staticmethod
-    def pd2gpd(point_file,
-               x_column,
-               y_column,
-               zone_df):
+    def pandas_to_geo(point_file,
+                      x_column,
+                      y_column,
+                      zone_df):
 
         """
         Converts a Pandas DataFrame to a GeoPandas DataFrame
@@ -146,58 +160,67 @@ class PointStats(ZonesBase):
                                 crs=zone_df.crs,
                                 geometry=point_geometry)
 
-    def _load(self):
+    # def _load(self):
+    #
+    #     """
+    #     Loads the files into GeoDataFrames
+    #     """
+    #
+    #     zone_df = gpd.read_file(self.zone_file)
+    #
+    #     # Merge zones
+    #     g = zone_df.groupby(self.zone_column)
+    #
+    #     self.zone_df = gpd.GeoDataFrame(g.mean().reset_index(),
+    #                                     crs=zone_df.crs,
+    #                                     geometry=zone_df.geometry)
+    #
+    #     if self.point_file.lower().endswith('.csv'):
+    #
+    #         self.point_df = self.pandas_to_geo(self.point_file,
+    #                                            self.x_column,
+    #                                            self.y_column,
+    #                                            self.zone_df)
+    #
+    #     else:
+    #         self.point_df = gpd.read_file(self.point_file)
+    #
+    #     self.point_index = self.point_df.sindex
 
-        """
-        Loads the files into Geo DataFrames
-        """
-
-        zone_df = gpd.read_file(self.zone_file)
-
-        # Merge zones
-        g = zone_df.groupby(self.zone_column)
-
-        self.zone_df = gpd.GeoDataFrame(g.mean().reset_index(),
-                                        crs=zone_df.crs,
-                                        geometry=zone_df.geometry)
-
-        if self.point_file.lower().endswith('.csv'):
-
-            self.point_df = self.pd2gpd(self.point_file,
-                                        self.x_column,
-                                        self.y_column,
-                                        self.zone_df)
-
-        else:
-            self.point_df = gpd.read_file(self.point_file)
-
-        self.point_index = self.point_df.sindex
-
-    def _prepare_values(self):
+    def prepare_values(self):
 
         if isinstance(self.query, str):
+
+            # Query a subset of the DataFrame
             self.values_df = self.values_df.query(self.query)
 
         if isinstance(self.point_proj, str):
+
+            # Set the projection with a user defined CRS
             self.values_df.crs = self.point_proj
 
+        if self.values_df.crs != self.zones_df.crs:
+
+            if self.verbose > 0:
+                logger.info('  Transforming value DataFrame CRS ...')
+
+            # Transform the values CRS to match the zones CRS
+            self.values_df = self.values_df.to_crs(self.zones_df.crs)
+
         if self.verbose > 0:
-            logger.info('  Transforming value DataFrame CRS ...')
+            logger.info('  Setting up the spatial index ...')
 
-        self.values_df = self.values_df.to_crs(self.zones_df.crs)
-
-        if self.verbose > 0:
-            logger.info('  Setting up spatial index ...')
-
+        # Creat the spatial index
         self.point_index = self.values_df.sindex
 
-    def _iter(self, stats):
+    def zone_iter(self, stats):
 
         global point_index_g, values_df_g
 
         point_index_g = None
         values_df_g = None
 
+        # Prepare the DataFrames
         self._prepare_values()
 
         if (self.n_jobs != 1) and (len(self.stats) == 1):
@@ -205,10 +228,13 @@ class PointStats(ZonesBase):
             point_index_g = self.point_index
             values_df_g = self.values_df
 
-            results = Parallel(n_jobs=self.n_jobs)(delayed(worker)(didx, dfrow, stats[0], self.value_column)
+            results = Parallel(n_jobs=self.n_jobs)(delayed(worker)(didx,
+                                                                   dfrow,
+                                                                   stats[0],
+                                                                   self.value_column)
                                                    for didx, dfrow in self.zones_df.iterrows())
 
-            self.values_df = dict(results)
+            self.zone_values = dict(results)
 
         else:
 

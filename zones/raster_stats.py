@@ -1,6 +1,6 @@
 from __future__ import division
 
-from .base import ZonesBase
+from .base import ZonesMixin
 from .errors import logger
 from .stats import STAT_DICT
 
@@ -9,26 +9,96 @@ from mpglue import raster_tools
 import numpy as np
 from osgeo import gdal, ogr, osr
 
+from joblib import Parallel, delayed
 from tqdm import tqdm
 
+shapely.speedups.enable()
 
-class RasterStats(ZonesBase):
+
+def worker(didx, df_row, stat, proj4, raster_value, no_data):
+
+    return_early = False
+
+    geom = df_row.geometry
+
+    # Rasterize the data
+    poly_array, image_array = self._rasterize(geom, proj4, values_src_g, values_df_g)
+
+    if isinstance(raster_value, int):
+
+        image_array = np.where(image_array == raster_value, 1, 0)
+
+        if image_array.max() == 0:
+            continue
+
+    elif isinstance(raster_value, list):
+
+        image_array_ = np.zeros(image_array.shape, dtype='uint8')
+
+        for raster_value_ in raster_value:
+            image_array_ = np.where(image_array == raster_value_, 1, image_array_)
+
+        image_array = image_array_
+
+        if image_array.max() == 0:
+
+            values = 0.0
+            return_early = True
+
+    if not return_early:
+
+        if not isinstance(poly_array, np.ndarray):
+            image_array = np.array([0], dtype='float32')
+        else:
+
+            null_idx = np.where(poly_array == 0)
+
+            if null_idx[0].size > 0:
+                image_array[null_idx] = no_data
+
+            if any(['nan' in x for x in stats]):
+
+                no_data_idx = np.where(image_array == no_data)
+
+                if no_data_idx[0].size > 0:
+                    image_array[no_data_idx] = np.nan
+
+        stat_func = STAT_DICT[stat]
+
+        values = stat_func(image_array)
+
+    return didx, values
+
+
+class RasterStats(ZonesMixin):
 
     """
     Args:
         values (str): The raster values file. Can be float or categorical raster.
-        zones (str): The zones file. It should be a polygon vector file.
+        zones (str or GeoDataFrame): The zones file.
+            Accepted types are:
+                str: vector file (e.g., shapefile, or geopackage)
+                GeoDataFrame: the geometry type must be `Polygon`
         unique_column (Optional[str]): A unique column identifier. Default is None.
         no_data (Optional[int or float]): A no data value to mask. Default is 0.
         raster_value (Optional[int or list]): A raster value to get statistics for. Default is None.
         band (Optional[int]): The band to calculate (if multi-band). Default is None, or calculate all bands.
         verbose (Optional[int]): The verbosity level. Default is 0.
+        n_jobs (Optional[int]): The number of parallel processes (zones). Default is 1.
+            *Currently, this only works with one statistic.
 
     Examples:
         >>> import zones
+        >>>
         >>> zs = zones.RasterStats('values.tif', 'zones.shp')
-        >>> df = zs.calculate(['mean'])
+        >>>
+        >>> # Calculate the 'mean'.
+        >>> df = zs.calculate('mean')
+        >>>
+        >>> # Calculate multiple statistics.
         >>> df = zs.calculate(['nanmean', 'nansum'])
+        >>>
+        >>> # Write data to file
         >>> df.to_file('stats.shp')
         >>> df.to_csv('stats.csv')
     """
@@ -40,7 +110,8 @@ class RasterStats(ZonesBase):
                  no_data=0,
                  raster_value=None,
                  band=None,
-                 verbose=0):
+                 verbose=0,
+                 n_jobs=1):
 
         self.values = values
         self.zones = zones
@@ -49,91 +120,114 @@ class RasterStats(ZonesBase):
         self.raster_value = raster_value
         self.band = band
         self.verbose = verbose
+        self.n_jobs = n_jobs
 
         self.stats = None
         self.zone_values = None
 
-    def _iter(self, stats):
+    def zone_iter(self, stats):
+
+        global values_df_g, values_src_g
+
+        values_df_g = None
+        values_src_g = None
 
         proj4 = self._prepare_proj4()
 
         n = self.zones_df.shape[0]
 
-        for didx, df_row in tqdm(self.zones_df.iterrows(), leave=False):
+        if (self.n_jobs != 1) and (len(self.stats) == 1):
 
-            if self.verbose > 1:
-                logger.info('    Zone {:,d} of {:,d} ...'.format(didx+1, n))
+            values_df_g = self.values
+            values_src_g = self.values_src
 
-            geom = df_row.geometry
+            results = Parallel(n_jobs=self.n_jobs)(delayed(worker)(didx,
+                                                                   dfrow,
+                                                                   stats[0],
+                                                                   proj4,
+                                                                   self.raster_value,
+                                                                   self.no_data)
+                                                   for didx, dfrow in self.zones_df.iterrows())
 
-            # Rasterize the data
-            poly_array, image_array = self._rasterize(geom, proj4, self.values_src, self.values)
+            self.zone_values = dict(results)
 
-            if isinstance(self.raster_value, int):
+        else:
 
-                image_array = np.where(image_array == self.raster_value, 1, 0)
+            for didx, df_row in tqdm(self.zones_df.iterrows(), leave=False):
 
-                if image_array.max() == 0:
-                    continue
+                if self.verbose > 1:
+                    logger.info('    Zone {:,d} of {:,d} ...'.format(didx+1, n))
 
-            elif isinstance(self.raster_value, list):
+                geom = df_row.geometry
 
-                image_array_ = np.zeros(image_array.shape, dtype='uint8')
+                # Rasterize the data
+                poly_array, image_array = self._rasterize(geom, proj4, self.values_src, self.values)
 
-                for raster_value_ in self.raster_value:
-                    image_array_ = np.where(image_array == raster_value_, 1, image_array_)
+                if isinstance(self.raster_value, int):
 
-                image_array = image_array_
+                    image_array = np.where(image_array == self.raster_value, 1, 0)
 
-                if image_array.max() == 0:
-                    continue
+                    if image_array.max() == 0:
+                        continue
 
-            if not isinstance(poly_array, np.ndarray):
-                image_array = np.array([0], dtype='float32')
-            else:
+                elif isinstance(self.raster_value, list):
 
-                null_idx = np.where(poly_array == 0)
+                    image_array_ = np.zeros(image_array.shape, dtype='uint8')
 
-                if null_idx[0].size > 0:
-                    image_array[null_idx] = self.no_data
+                    for raster_value_ in self.raster_value:
+                        image_array_ = np.where(image_array == raster_value_, 1, image_array_)
 
-                if any(['nan' in x for x in stats]):
+                    image_array = image_array_
 
-                    no_data_idx = np.where(image_array == self.no_data)
+                    if image_array.max() == 0:
+                        continue
 
-                    if no_data_idx[0].size > 0:
-                        image_array[no_data_idx] = np.nan
+                if not isinstance(poly_array, np.ndarray):
+                    image_array = np.array([0], dtype='float32')
+                else:
 
-            if len(image_array.shape) == 2:
+                    null_idx = np.where(poly_array == 0)
 
-                for sidx, stat in enumerate(stats):
+                    if null_idx[0].size > 0:
+                        image_array[null_idx] = self.no_data
 
-                    stat_func = STAT_DICT[stat]
+                    if any(['nan' in x for x in stats]):
 
-                    # TODO: if zones are not unique
-                    self.zone_values[1][didx][sidx] = stat_func(image_array)
+                        no_data_idx = np.where(image_array == self.no_data)
 
-            else:
+                        if no_data_idx[0].size > 0:
+                            image_array[no_data_idx] = np.nan
 
-                if isinstance(self.band, int):
+                if len(image_array.shape) == 2:
 
                     for sidx, stat in enumerate(stats):
 
                         stat_func = STAT_DICT[stat]
 
                         # TODO: if zones are not unique
-                        self.zone_values[self.band][didx][sidx] = stat_func(image_array[self.band-1])
+                        self.zone_values[1][didx][sidx] = stat_func(image_array)
 
                 else:
 
-                    for bidx in range(1, self.values_src.bands+1):
+                    if isinstance(self.band, int):
 
                         for sidx, stat in enumerate(stats):
 
                             stat_func = STAT_DICT[stat]
 
                             # TODO: if zones are not unique
-                            self.zone_values[bidx][didx][sidx] = stat_func(image_array[bidx-1])
+                            self.zone_values[self.band][didx][sidx] = stat_func(image_array[self.band-1])
+
+                    else:
+
+                        for bidx in range(1, self.values_src.bands+1):
+
+                            for sidx, stat in enumerate(stats):
+
+                                stat_func = STAT_DICT[stat]
+
+                                # TODO: if zones are not unique
+                                self.zone_values[bidx][didx][sidx] = stat_func(image_array[bidx-1])
 
     @staticmethod
     def _rasterize(geom, proj4, image_src, image_name):

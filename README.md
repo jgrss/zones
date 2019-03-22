@@ -1,13 +1,13 @@
 Zonal statistics on raster data
 ---
 
-The `zones` library calculates summary statistics with vector and raster data. The library manages projections on-the-fly, 
-so there is no need to ensure consistency prior to running.  Statistics are processed per zone, so memory requirements 
-scale with the size of the vector polygons. 
+The `zones` library calculates summary statistics with vector and raster data. The library manages projections on-the-fly,
+so there is no need to ensure consistency prior to running.  Statistics are processed per zone, so memory requirements
+scale with the size of the vector polygons.
 
 ### Planned support
 
-Currently, vector points are supported for `PointStats`, but support for tabular x,y data will 
+Currently, vector points are supported for `PointStats`, but support for tabular x,y data will
 also be added.
 
 
@@ -29,6 +29,16 @@ also be added.
 >>> df.to_csv('stats.csv')
 ```
 
+#### The zone data can also be a `GeoDataFrame`.
+
+```python
+>>> import geopandas as gpd
+>>>
+>>> gdf = gpd.read_file('data.shp')
+>>>
+>>> zs = zones.RasterStats('values.tif', gdf, verbose=2)
+```
+
 ### Zonal stats with polygon and vector point data
 
 ```python
@@ -47,12 +57,26 @@ also be added.
 >>> df = zs.calculate('mean')
 ```
 
+### Parallel processing
+
+#### Zones can be processed in parallel.
+
+> Currently, only one statistic is supported when `n_jobs` is not equal to 1.
+
+```python
+>>> # Process zones in parallel, using all available CPUs.
+>>> zs = zones.RasterStats('values.tif', 'zones.shp', n_jobs=-1)
+>>> zs.calculate('var')
+```
+
 ### Other methods
 
 ```python
 >>> # Get available stats
 >>> print(zs.stats_avail)
->>>
+```
+
+```python
 >>> # To store the data as a distribution, use 'dist'.
 >>> df = zs.calculate('dist')
 ```
@@ -65,4 +89,3 @@ also be added.
 ```
 
 ... should result in `If there were no assertion errors, the tests ran OK.`
-
