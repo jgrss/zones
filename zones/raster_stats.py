@@ -96,7 +96,12 @@ def rasterize(geom, proj4, image_src, image_name):
     return poly_array, image_array
 
 
-def worker(didx, df_row, stat, proj4, raster_value, no_data):
+def worker(didx, df_row, stat, proj4, raster_value, no_data, verbose, n):
+
+    if verbose > 1:
+
+        if didx % 100 == 0:
+            logger.info('    Zone {:,d} of {:,d} ...'.format(didx+1, n))
 
     return_early = False
 
@@ -219,6 +224,9 @@ class RasterStats(ZonesMixin):
 
         n = self.zones_df.shape[0]
 
+        if self.verbose > 0:
+            logger.info('  Calculating statistics ...')
+
         if (self.n_jobs != 1) and (len(self.stats) == 1):
 
             values_df_g = self.values
@@ -229,7 +237,9 @@ class RasterStats(ZonesMixin):
                                                                    stats[0],
                                                                    proj4,
                                                                    self.raster_value,
-                                                                   self.no_data)
+                                                                   self.no_data,
+                                                                   self.verbose,
+                                                                   n)
                                                    for didx, dfrow in self.zones_df.iterrows())
 
             self.zone_values = dict(results)
