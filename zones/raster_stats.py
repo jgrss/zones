@@ -15,6 +15,86 @@ from tqdm import tqdm
 shapely.speedups.enable()
 
 
+def rasterize(geom, proj4, image_src, image_name):
+
+    """
+    Rasterizes a polygon geometry
+    """
+
+    # left, bottom, right, top = geom.bounds
+
+    # Create a memory layer to rasterize from.
+    datasource = ogr.GetDriverByName('Memory').CreateDataSource('wrk')
+    sp_ref = osr.SpatialReference()
+    sp_ref.ImportFromProj4(proj4)
+
+    # Transform the geometry
+    target_sr = osr.SpatialReference()
+    target_sr.ImportFromWkt(image_src.projection)
+    transform = osr.CoordinateTransformation(sp_ref, target_sr)
+    gdal_geom = ogr.CreateGeometryFromWkt(geom.to_wkt())
+    gdal_geom.Transform(transform)
+
+    # Get the transformation boundary
+    left, right, bottom, top = gdal_geom.GetEnvelope()
+
+    # Create the new layer
+    lyr = datasource.CreateLayer('', geom_type=ogr.wkbPolygon, srs=target_sr)
+    field_def = ogr.FieldDefn('Value', ogr.OFTInteger)
+    lyr.CreateField(field_def)
+
+    # Add a feature
+    feature = ogr.Feature(lyr.GetLayerDefn())
+    feature.SetGeometryDirectly(ogr.Geometry(wkt=str(gdal_geom)))
+    feature.SetField('Value', 1)
+    lyr.CreateFeature(feature)
+
+    xcount = int(round((right - left) / image_src.cellY))
+    ycount = int(round((top - bottom) / image_src.cellY))
+
+    # Create a raster to rasterize into.
+    try:
+        target_ds = gdal.GetDriverByName('MEM').Create('', xcount, ycount, 1, gdal.GDT_Byte)
+    except:
+        return None, None
+
+    target_ds.SetGeoTransform([left, image_src.cellY, 0., top, 0., -image_src.cellY])
+    target_ds.SetProjection(target_sr.ExportToWkt())
+
+    # Rasterize
+    gdal.RasterizeLayer(target_ds, [1], lyr, options=['ATTRIBUTE=Value'])
+
+    poly_array = np.uint8(target_ds.GetRasterBand(1).ReadAsArray())
+
+    datasource = None
+    target_ds = None
+
+    #image_array = image_src.read(bands2open=-1,
+                                #x=left,
+                                #y=top,
+                                #rows=ycount,
+                                #cols=xcount,
+                                #d_type='float32')
+
+    src = raster_tools.warp(image_name,
+                            'temp.mem',
+                            format='MEM',
+                            out_proj=image_src.projection,
+                            multithread=True,
+                            outputBounds=[left, top-(ycount*image_src.cellY), left+(xcount*image_src.cellY), top],
+                            cell_size=image_src.cellY,
+                            d_type='float32',
+                            return_datasource=True,
+                            warpMemoryLimit=256)
+
+    image_array = src.read(bands2open=-1)
+
+    src.close_file()
+    src = None
+
+    return poly_array, image_array
+
+
 def worker(didx, df_row, stat, proj4, raster_value, no_data):
 
     return_early = False
@@ -22,14 +102,16 @@ def worker(didx, df_row, stat, proj4, raster_value, no_data):
     geom = df_row.geometry
 
     # Rasterize the data
-    poly_array, image_array = self._rasterize(geom, proj4, values_src_g, values_df_g)
+    poly_array, image_array = rasterize(geom, proj4, values_src_g, values_df_g)
 
     if isinstance(raster_value, int):
 
         image_array = np.where(image_array == raster_value, 1, 0)
 
         if image_array.max() == 0:
-            continue
+            
+            values = 0.0
+            return_early = True
 
     elif isinstance(raster_value, list):
 
@@ -56,7 +138,7 @@ def worker(didx, df_row, stat, proj4, raster_value, no_data):
             if null_idx[0].size > 0:
                 image_array[null_idx] = no_data
 
-            if any(['nan' in x for x in stats]):
+            if any(['nan' in x for x in stat]):
 
                 no_data_idx = np.where(image_array == no_data)
 
@@ -161,7 +243,7 @@ class RasterStats(ZonesMixin):
                 geom = df_row.geometry
 
                 # Rasterize the data
-                poly_array, image_array = self._rasterize(geom, proj4, self.values_src, self.values)
+                poly_array, image_array = rasterize(geom, proj4, self.values_src, self.values)
 
                 if isinstance(self.raster_value, int):
 
@@ -228,83 +310,3 @@ class RasterStats(ZonesMixin):
 
                                 # TODO: if zones are not unique
                                 self.zone_values[bidx][didx][sidx] = stat_func(image_array[bidx-1])
-
-    @staticmethod
-    def _rasterize(geom, proj4, image_src, image_name):
-
-        """
-        Rasterizes a polygon geometry
-        """
-
-        # left, bottom, right, top = geom.bounds
-
-        # Create a memory layer to rasterize from.
-        datasource = ogr.GetDriverByName('Memory').CreateDataSource('wrk')
-        sp_ref = osr.SpatialReference()
-        sp_ref.ImportFromProj4(proj4)
-
-        # Transform the geometry
-        target_sr = osr.SpatialReference()
-        target_sr.ImportFromWkt(image_src.projection)
-        transform = osr.CoordinateTransformation(sp_ref, target_sr)
-        gdal_geom = ogr.CreateGeometryFromWkt(geom.to_wkt())
-        gdal_geom.Transform(transform)
-
-        # Get the transformation boundary
-        left, right, bottom, top = gdal_geom.GetEnvelope()
-
-        # Create the new layer
-        lyr = datasource.CreateLayer('', geom_type=ogr.wkbPolygon, srs=target_sr)
-        field_def = ogr.FieldDefn('Value', ogr.OFTInteger)
-        lyr.CreateField(field_def)
-
-        # Add a feature
-        feature = ogr.Feature(lyr.GetLayerDefn())
-        feature.SetGeometryDirectly(ogr.Geometry(wkt=str(gdal_geom)))
-        feature.SetField('Value', 1)
-        lyr.CreateFeature(feature)
-
-        xcount = int(round((right - left) / image_src.cellY))
-        ycount = int(round((top - bottom) / image_src.cellY))
-
-        # Create a raster to rasterize into.
-        try:
-            target_ds = gdal.GetDriverByName('MEM').Create('', xcount, ycount, 1, gdal.GDT_Byte)
-        except:
-            return None, None
-
-        target_ds.SetGeoTransform([left, image_src.cellY, 0., top, 0., -image_src.cellY])
-        target_ds.SetProjection(target_sr.ExportToWkt())
-
-        # Rasterize
-        gdal.RasterizeLayer(target_ds, [1], lyr, options=['ATTRIBUTE=Value'])
-
-        poly_array = np.uint8(target_ds.GetRasterBand(1).ReadAsArray())
-
-        datasource = None
-        target_ds = None
-
-        #image_array = image_src.read(bands2open=-1,
-                                    #x=left,
-                                    #y=top,
-                                    #rows=ycount,
-                                    #cols=xcount,
-                                    #d_type='float32')
-
-        src = raster_tools.warp(image_name,
-                                'temp.mem',
-                                format='MEM',
-                                out_proj=image_src.projection,
-                                multithread=True,
-                                outputBounds=[left, top-(ycount*image_src.cellY), left+(xcount*image_src.cellY), top],
-                                cell_size=image_src.cellY,
-                                d_type='float32',
-                                return_datasource=True,
-                                warpMemoryLimit=256)
-
-        image_array = src.read(bands2open=-1)
-
-        src.close_file()
-        src = None
-
-        return poly_array, image_array
