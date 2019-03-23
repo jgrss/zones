@@ -8,6 +8,7 @@ from mpglue import raster_tools
 
 import numpy as np
 from osgeo import gdal, ogr, osr
+import shapely
 
 from joblib import Parallel, delayed
 from tqdm import tqdm
@@ -109,7 +110,7 @@ def worker(didx, df_row, stat, proj4, raster_value, no_data):
         image_array = np.where(image_array == raster_value, 1, 0)
 
         if image_array.max() == 0:
-            
+
             values = 0.0
             return_early = True
 
