@@ -201,13 +201,13 @@ class PointStats(ZonesMixin):
 
         if self.values_df.crs != self.zones_df.crs:
 
-            if self.verbose > 0:
+            if self.verbose > 1:
                 logger.info('  Transforming value DataFrame CRS ...')
 
             # Transform the values CRS to match the zones CRS
             self.values_df = self.values_df.to_crs(self.zones_df.crs)
 
-        if self.verbose > 0:
+        if self.verbose > 1:
             logger.info('  Setting up the spatial index ...')
 
         # Creat the spatial index
@@ -221,18 +221,19 @@ class PointStats(ZonesMixin):
         values_df_g = None
 
         # Prepare the DataFrames
-        self._prepare_values()
+        self.prepare_values()
 
         if (self.n_jobs != 1) and (len(self.stats) == 1):
 
             point_index_g = self.point_index
             values_df_g = self.values_df
 
-            results = Parallel(n_jobs=self.n_jobs)(delayed(worker)(didx,
-                                                                   dfrow,
-                                                                   stats[0],
-                                                                   self.value_column)
-                                                   for didx, dfrow in self.zones_df.iterrows())
+            results = Parallel(n_jobs=self.n_jobs,
+                               max_nbytes=None)(delayed(worker)(didx,
+                                                                dfrow,
+                                                                stats[0],
+                                                                self.value_column)
+                                                for didx, dfrow in self.zones_df.iterrows())
 
             self.zone_values = dict(results)
 
