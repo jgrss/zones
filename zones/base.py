@@ -130,6 +130,9 @@ class ZonesMixin(object):
 
     def finalize_dataframe(self):
 
+        if self.zone_values.empty:
+            return self.zones_df
+
         if hasattr(self, 'band'):
 
             if isinstance(self.band, int):
@@ -154,10 +157,7 @@ class ZonesMixin(object):
             values_df = pd.DataFrame.from_dict(self.zone_values, orient='index')
             values_df.columns = self.stats
 
-        try:
-            return pd.merge(self.zones_df, values_df, left_index=True, right_index=True)
-        except:
-            return self.zones_df
+        return pd.merge(self.zones_df, values_df, left_index=True, right_index=True)
 
     def _close_files(self):
 
