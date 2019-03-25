@@ -130,8 +130,7 @@ class ZonesMixin(object):
 
     def finalize_dataframe(self):
 
-        if not self.zone_values:
-            return self.zones_df
+        print(self.zone_values)
 
         if hasattr(self, 'band'):
 
