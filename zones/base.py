@@ -56,7 +56,8 @@ class ZonesMixin(object):
 
         return self.finalize_dataframe()
 
-    def check_if_geodf(self, data_file):
+    @staticmethod
+    def check_if_geodf(data_file):
 
         """
         Checks for file data type
@@ -153,7 +154,10 @@ class ZonesMixin(object):
             values_df = pd.DataFrame.from_dict(self.zone_values, orient='index')
             values_df.columns = self.stats
 
-        return pd.merge(self.zones_df, values_df, left_index=True, right_index=True)
+        try:
+            return pd.merge(self.zones_df, values_df, left_index=True, right_index=True)
+        except:
+            return self.zones_df
 
     def _close_files(self):
 
