@@ -134,11 +134,7 @@ class ZonesMixin(object):
 
             if isinstance(self.band, int):
 
-                if self.n_bands == 1:
-                    values_df = pd.DataFrame.from_dict(self.zone_values[self.band], orient='index')
-                else:
-                    values_df = pd.DataFrame.from_dict(self.zone_values, orient='index')
-                    
+                values_df = pd.DataFrame.from_dict(self.zone_values, orient='index')
                 values_df.columns = ('_bd{:d},'.format(self.band).join(self.stats) + '_bd{:d}'.format(self.band)).split(',')
 
             else:
