@@ -184,10 +184,12 @@ class ZonesMixin(object):
             logger.error('  The values file does not exist.')
             raise ValuesFileError
 
-        if not os.path.isfile(self.zones):
+        if not isinstance(self.zones, gpd.GeoDataFrame):
 
-            logger.error('  The zones file does not exist.')
-            raise ZonesFileError
+            if not os.path.isfile(self.zones):
+
+                logger.error('  The zones file does not exist.')
+                raise ZonesFileError
 
         if list(set(stats).difference(STAT_DICT.keys())):
 
