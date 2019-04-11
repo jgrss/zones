@@ -107,6 +107,9 @@ def worker(didx, df_row, stat, proj4, raster_value, no_data, verbose, n):
 
     geom = df_row.geometry
 
+    if not geom:
+        return dix, np.nan
+
     # Rasterize the data
     poly_array, image_array = rasterize(geom, proj4, values_src_g, values_df_g)
 
@@ -153,7 +156,10 @@ def worker(didx, df_row, stat, proj4, raster_value, no_data, verbose, n):
 
         stat_func = STAT_DICT[stat]
 
-        values = stat_func(image_array)
+        if stat == 'mode':
+            values = float(stat_func(image_array).mode)
+        else:
+            values = stat_func(image_array)
 
     return didx, values
 
@@ -253,6 +259,9 @@ class RasterStats(ZonesMixin):
 
                 geom = df_row.geometry
 
+                if not geom:
+                    continue
+
                 # Rasterize the data
                 poly_array, image_array = rasterize(geom, proj4, self.values_src, self.values)
 
@@ -291,14 +300,22 @@ class RasterStats(ZonesMixin):
                         if no_data_idx[0].size > 0:
                             image_array[no_data_idx] = np.nan
 
-                if len(image_array.shape) == 2:
+                        if np.isnan(image_array.max()):
+                            continue
+
+                if len(image_array.shape) <= 2:
 
                     for sidx, stat in enumerate(stats):
 
                         stat_func = STAT_DICT[stat]
 
                         # TODO: if zones are not unique
-                        self.zone_values[1][didx][sidx] = stat_func(image_array)
+                        if stat == 'mode':
+                            self.zone_values[1][didx][sidx] = float(stat_func(image_array).mode)
+                        elif stat == 'nanmode':
+                            self.zone_values[1][didx][sidx] = float(stat_func(image_array[np.where(~np.isnan(image_array))]).mode)
+                        else:
+                            self.zone_values[1][didx][sidx] = stat_func(image_array)
 
                 else:
 
@@ -309,7 +326,12 @@ class RasterStats(ZonesMixin):
                             stat_func = STAT_DICT[stat]
 
                             # TODO: if zones are not unique
-                            self.zone_values[self.band][didx][sidx] = stat_func(image_array[self.band-1])
+                            if stat == 'mode':
+                                self.zone_values[self.band][didx][sidx] = float(stat_func(image_array[self.band-1]).mode)
+                            elif stat == 'nanmode':
+                                self.zone_values[self.band][didx][sidx] = float(stat_func(image_array[self.band-1][np.where(~np.isnan(image_array))]).mode)
+                            else:
+                                self.zone_values[self.band][didx][sidx] = stat_func(image_array[self.band-1])
 
                     else:
 
@@ -320,4 +342,9 @@ class RasterStats(ZonesMixin):
                                 stat_func = STAT_DICT[stat]
 
                                 # TODO: if zones are not unique
-                                self.zone_values[bidx][didx][sidx] = stat_func(image_array[bidx-1])
+                                if stat == 'mode':
+                                    self.zone_values[bidx][didx][sidx] = float(stat_func(image_array[bidx-1]).mode)
+                                elif stat == 'nanmode':
+                                    self.zone_values[bidx][didx][sidx] = float(stat_func(image_array[bidx-1][np.where(~np.isnan(image_array))]).mode)
+                                else:
+                                    self.zone_values[bidx][didx][sidx] = stat_func(image_array[bidx-1])

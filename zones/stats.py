@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.stats import mode
 
 
 STAT_DICT = dict(mean=np.mean,
@@ -10,6 +11,8 @@ STAT_DICT = dict(mean=np.mean,
                  var=np.var,
                  nanvar=np.nanvar,
                  sum=np.sum,
+                 mode=mode,
+                 nanmode=mode,
                  nansum=np.nansum,
                  min=np.min,
                  nanmin=np.nanmin,
