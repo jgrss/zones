@@ -1,21 +1,22 @@
 import numpy as np
+import bottleneck as bn
 from scipy.stats import mode
 
 
 STAT_DICT = dict(mean=np.mean,
-                 nanmean=np.nanmean,
+                 nanmean=bn.nanmean,
                  median=np.median,
-                 nanmedian=np.nanmedian,
+                 nanmedian=bn.nanmedian,
                  std=np.std,
-                 nanstd=np.nanstd,
+                 nanstd=bn.nanstd,
                  var=np.var,
-                 nanvar=np.nanvar,
+                 nanvar=bn.nanvar,
                  sum=np.sum,
                  mode=mode,
                  nanmode=mode,
-                 nansum=np.nansum,
+                 nansum=bn.nansum,
                  min=np.min,
-                 nanmin=np.nanmin,
+                 nanmin=bn.nanmin,
                  max=np.max,
-                 nanmax=np.nanmax,
+                 nanmax=bn.nanmax,
                  dist=None)

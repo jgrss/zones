@@ -4,7 +4,7 @@ from distutils.core import setup
 import numpy as np
 
 
-__version__ = '0.0.1dev'
+__version__ = '0.0.2dev'
 
 lib_name = 'zones'
 maintainer = 'Jordan Graesser'
@@ -19,11 +19,12 @@ with open('LICENSE.txt') as f:
     license_file = f.read()
 
 required_packages = ['GDAL',
-                     'numpy'
+                     'numpy',
                      'tqdm',
                      'future',
                      'geopandas',
-                     'pandas']
+                     'pandas',
+                     'bottleneck']
 
 
 def get_packages():

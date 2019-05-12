@@ -9,6 +9,7 @@ from mpglue import raster_tools
 import numpy as np
 from osgeo import gdal, ogr, osr
 import shapely
+import bottleneck as bn
 
 from joblib import Parallel, delayed
 from tqdm import tqdm
@@ -108,7 +109,7 @@ def worker(didx, df_row, stat, proj4, raster_value, no_data, verbose, n):
     geom = df_row.geometry
 
     if not geom:
-        return dix, np.nan
+        return didx, np.nan
 
     # Rasterize the data
     poly_array, image_array = rasterize(geom, proj4, values_src_g, values_df_g)
@@ -153,6 +154,9 @@ def worker(didx, df_row, stat, proj4, raster_value, no_data, verbose, n):
 
                 if no_data_idx[0].size > 0:
                     image_array[no_data_idx] = np.nan
+
+                if np.isnan(bn.nanmax(image_array)):
+                    return didx, np.nan
 
         stat_func = STAT_DICT[stat]
 
@@ -252,7 +256,7 @@ class RasterStats(ZonesMixin):
 
         else:
 
-            for didx, df_row in tqdm(self.zones_df.iterrows(), leave=False):
+            for didx, df_row in tqdm(self.zones_df.iterrows()):
 
                 if self.verbose > 1:
                     logger.info('    Zone {:,d} of {:,d} ...'.format(didx+1, n))
@@ -300,7 +304,7 @@ class RasterStats(ZonesMixin):
                         if no_data_idx[0].size > 0:
                             image_array[no_data_idx] = np.nan
 
-                        if np.isnan(image_array.max()):
+                        if np.isnan(bn.nanmax(image_array)):
                             continue
 
                 if len(image_array.shape) <= 2:
