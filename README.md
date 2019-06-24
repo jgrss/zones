@@ -21,13 +21,20 @@ The following dependencies are installed, or upgraded, automatically.
 
 ### Installation
 
-Example on Linux
+#### Example on Linux
+
+Install `MpGlue`
 
 ```commandline
 > git clone https://github.com/jgrss/mpglue
 > cd mpglue/
 > python3.6 setup.py build && pip3.6 install --user . && rm -rf build/
 > cd ../
+```
+
+Install `zones`
+
+```commandline
 > git clone https://github.com/jgrss/zones
 > cd zones/
 > pip3.6 install --user .
