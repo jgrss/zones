@@ -19,6 +19,22 @@ The following dependencies are installed, or upgraded, automatically.
 - Pandas
 - Bottleneck
 
+### Installation
+
+Example on Linux
+
+```commandline
+> git clone https://github.com/jgrss/mpglue
+> cd mpglue/
+> python3.6 setup.py build && pip3.6 install --user . && rm -rf build/
+> cd ../
+> git clone https://github.com/jgrss/zones
+> cd zones/
+> pip3.6 install --user .
+> cd ~
+> python3.6 -c "import zones;zones.test_raster()"
+```
+
 ### Zonal stats with polygon and raster data
 
 ```python
