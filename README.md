@@ -5,6 +5,19 @@ The `zones` library calculates summary statistics with vector and raster data. T
 so there is no need to ensure consistency prior to running.  Statistics are processed per zone, so memory requirements
 scale with the size of the vector polygons.
 
+### Dependencies
+
+Data I/O is handled with [MpGlue](https://github.com/jgrss/mpglue).
+
+The following dependencies are installed, or upgraded, automatically.
+
+- GDAL
+- NumPy
+- tqdm
+- future
+- GeoPandas
+- Pandas
+- Bottleneck
 
 ### Zonal stats with polygon and raster data
 
