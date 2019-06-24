@@ -71,7 +71,7 @@ For multi-band images, the default is to calculate all bands, but the raster ban
 The default 'no data' value is 0, but it can be specified.
 
 ```python
-# Calculate statistics for band 2
+# Calculate statistics for band 3, ignoring values of 255
 >>> zs = zones.RasterStats('values.tif', 'zones.shp', band=3, no_data=255)
 >>> df = zs.calculate('median')
 ```
