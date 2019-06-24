@@ -177,7 +177,6 @@ class RasterStats(ZonesMixin):
             Accepted types are:
                 str: vector file (e.g., shapefile, or geopackage)
                 GeoDataFrame: the geometry type must be `Polygon`
-        unique_column (Optional[str]): A unique column identifier. Default is None.
         no_data (Optional[int or float]): A no data value to mask. Default is 0.
         raster_value (Optional[int or list]): A raster value to get statistics for. Default is None.
         band (Optional[int]): The band to calculate (if multi-band). Default is None, or calculate all bands.
@@ -204,7 +203,6 @@ class RasterStats(ZonesMixin):
     def __init__(self,
                  values,
                  zones,
-                 unique_column=None,
                  no_data=0,
                  raster_value=None,
                  band=None,
@@ -213,7 +211,6 @@ class RasterStats(ZonesMixin):
 
         self.values = values
         self.zones = zones
-        self.unique_column = unique_column
         self.no_data = no_data
         self.raster_value = raster_value
         self.band = band
