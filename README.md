@@ -68,12 +68,12 @@ For multi-band images, the default is to calculate all bands, but the raster ban
 >>> df = zs.calculate('var')
 ```
 
-The default 'no data' value is 0, but it can be specified.
+The default 'no data' value is 0, but it can be specified. Note that 'no data' values are only ignored if 'nanstats' are used.
 
 ```python
 # Calculate statistics for band 3, ignoring values of 255
 >>> zs = zones.RasterStats('values.tif', 'zones.shp', band=3, no_data=255)
->>> df = zs.calculate('median')
+>>> df = zs.calculate('nanmedian')
 ```
 
 #### The zone data can also be a `GeoDataFrame` or any other vector format supported by `GeoPandas`.
