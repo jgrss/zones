@@ -5,11 +5,6 @@ The `zones` library calculates summary statistics with vector and raster data. T
 so there is no need to ensure consistency prior to running.  Statistics are processed per zone, so memory requirements
 scale with the size of the vector polygons.
 
-### Planned support
-
-Currently, vector points are supported for `PointStats`, but support for tabular x,y data will
-also be added.
-
 
 ### Zonal stats with polygon and raster data
 
