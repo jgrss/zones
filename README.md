@@ -1,7 +1,6 @@
-[](#mit-license) [](#python-3.6)
+[](#mit-license)[](#python-3.6)
 
 [![MIT license](https://img.shields.io/badge/License-MIT-black.svg)](https://lbesson.mit-license.org/)
-
 [![Python 3.6](https://img.shields.io/badge/python-3.6-black.svg)](https://www.python.org/downloads/release/python-360/)
 
 Zonal statistics on raster data
