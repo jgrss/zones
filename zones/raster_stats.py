@@ -79,7 +79,7 @@ def rasterize(geom, proj4, image_src, image_name):
                                 #d_type='float32')
 
     src = raster_tools.warp(image_name,
-                            'temp.mem',
+                            '',
                             format='MEM',
                             out_proj=image_src.projection,
                             multithread=True,
@@ -179,6 +179,9 @@ class RasterStats(ZonesMixin):
                 GeoDataFrame: the geometry type must be `Polygon`
         no_data (Optional[int or float]): A no data value to mask. Default is 0.
         raster_value (Optional[int or list]): A raster value to get statistics for. Default is None.
+        unique_column (Optional[str]): A unique column identifier for `zones`.
+            Default is None, which treats all zones as unique and uses the
+            highest (resolution) level geometry.
         band (Optional[int]): The band to calculate (if multi-band). Default is None, or calculate all bands.
         verbose (Optional[int]): The verbosity level. Default is 0.
         n_jobs (Optional[int]): The number of parallel processes (zones). Default is 1.
@@ -205,6 +208,7 @@ class RasterStats(ZonesMixin):
                  zones,
                  no_data=0,
                  raster_value=None,
+                 unique_column=None,
                  band=None,
                  verbose=0,
                  n_jobs=1):
@@ -213,6 +217,7 @@ class RasterStats(ZonesMixin):
         self.zones = zones
         self.no_data = no_data
         self.raster_value = raster_value
+        self.unique_column = unique_column
         self.band = band
         self.verbose = verbose
         self.n_jobs = n_jobs

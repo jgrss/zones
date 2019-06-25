@@ -4,7 +4,7 @@ from distutils.core import setup
 import numpy as np
 
 
-__version__ = '0.0.2dev'
+__version__ = '0.0.3dev'
 
 lib_name = 'zones'
 maintainer = 'Jordan Graesser'
@@ -27,6 +27,18 @@ required_packages = ['GDAL',
                      'bottleneck']
 
 
+def get_package_data():
+
+    return {'': ['*.md', '*.txt'],
+            'zones': ['datasets/raster/*.tif',
+                      'datasets/vector/*.cpg',
+                      'datasets/vector/*.dbf',
+                      'datasets/vector/*.prj',
+                      'datasets/vector/*.qpj',
+                      'datasets/vector/*.shp',
+                      'datasets/vector/*.shx']}
+
+
 def get_packages():
     return setuptools.find_packages()
 
@@ -42,6 +54,7 @@ def setup_package():
                     license=license_file,
                     version=__version__,
                     long_description=long_description,
+                    package_data=get_package_data(),
                     packages=get_packages(),
                     zip_safe=False,
                     download_url=git_url,
