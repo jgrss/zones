@@ -28,7 +28,7 @@ Install `MpGlue`
 ```commandline
 > git clone https://github.com/jgrss/mpglue
 > cd mpglue/
-> python3.6 setup.py build && pip3.6 install --user . && rm -rf build/
+> python3.6 setup.py install --user
 > cd ../
 ```
 
@@ -37,7 +37,7 @@ Install `zones`
 ```commandline
 > git clone https://github.com/jgrss/zones
 > cd zones/
-> pip3.6 install --user .
+> python3.6 setup.py install --user
 > cd ~
 > python3.6 -c "import zones;zones.test_raster()"
 ```
