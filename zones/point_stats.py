@@ -239,7 +239,7 @@ class PointStats(ZonesMixin):
 
         else:
 
-            for didx, df_row in tqdm(self.zones_df.iterrows(), leave=False):
+            for didx, df_row in tqdm(self.zones_df.iterrows(), total=self.zones_df.shape[0]):
 
                 # if self.verbose > 1:
                 #     logger.info('    Zone {:,d} of {:,d} ...'.format(didx + 1, n))
