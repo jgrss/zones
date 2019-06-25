@@ -1,7 +1,8 @@
-[](#mit-license)[](#python-3.6)
+[](#mit-license)[](#python-3.6)[](#github-last-commit)
 
 [![MIT license](https://img.shields.io/badge/License-MIT-black.svg)](https://lbesson.mit-license.org/)
 [![Python 3.6](https://img.shields.io/badge/python-3.6-black.svg)](https://www.python.org/downloads/release/python-360/)
+[![GitHub last commit](https://img.shields.io/github/last-commit/jongracecox/anybadge.svg)](https://github.com/jgrss/zones/commits/master)
 
 Zonal statistics on raster data
 ---
