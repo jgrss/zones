@@ -1,5 +1,3 @@
-from future.utils import viewitems
-
 import os
 
 from .errors import logger, ValuesFileError, StatsError, ZonesFileError
@@ -7,8 +5,10 @@ from .stats import STAT_DICT
 
 import mpglue as gl
 
+from osgeo import osr
 import pandas as pd
 import geopandas as gpd
+import six
 
 
 class ZonesMixin(object):
@@ -167,10 +167,16 @@ class ZonesMixin(object):
 
         proj4 = ''
 
-        for k, v in viewitems(self.zones_df.crs):
+        for k, v in six.iteritems(self.zones_df.crs):
             proj4 += '+{}={} '.format(k, v)
 
-        return proj4[:-1]
+        if not proj4:
+
+            sr = osr.SpatialReference()
+            sr.ImportFromWkt(self.values_src.projection)
+            proj4 = sr.ExportToProj4()
+
+        return proj4
 
     def check_arguments(self, stats):
 
@@ -195,3 +201,69 @@ class ZonesMixin(object):
 
             logger.error('  The statistic, {}, is not available.'.format(list(set(stats).difference(STAT_DICT.keys()))))
             raise StatsError
+
+    @staticmethod
+    def melt_dist(df, id_field=None):
+
+        """
+        Melts records of distributions into columns
+
+        Args:
+            df (DataFrame): The DataFrame to melt.
+            id_field (Optional[str]): An id field to include. Otherwise, only the band columns are melted.
+
+        Example:
+            >>> import zones
+            >>>
+            >>> zs = zones.RasterStats('raster.tif', 'vector.gpkg', n_jobs=1)
+            >>> df = zs.calculate('dist')
+            >>> df = zs.melt_dist(df, id_field='id')
+
+        Returns:
+            Melted DataFrame (DataFrame)
+        """
+
+        out_df = dict()
+
+        for i, df_row in df.iterrows():
+
+            if not isinstance(id_field, str):
+                first_col = True
+            else:
+                first_col = False
+
+            for col in df.columns.tolist():
+
+                if col.startswith('dist'):
+
+                    out_col = col.replace('dist_', '')
+
+                    val_list = df_row[col].split(';')
+                    val_list = list(map(float, val_list))
+
+                    if not first_col:
+
+                        if id_field in out_df:
+                            out_df[id_field] = out_df[id_field] + [int(df_row.id)] * len(val_list)
+                        else:
+                            out_df[id_field] = [int(df_row.id)] * len(val_list)
+
+                        first_col = True
+
+                    if out_col in out_df:
+                        out_df[out_col] = out_df[out_col] + val_list
+                    else:
+                        out_df[out_col] = val_list
+
+        min_length = 1e9
+        for key, value in six.iteritems(out_df):
+
+            if len(value) < min_length:
+                min_length = len(value)
+
+        for key, value in six.iteritems(out_df):
+
+            if len(value) > min_length:
+                out_df[key] = value[:min_length]
+
+        return pd.DataFrame(data=out_df)

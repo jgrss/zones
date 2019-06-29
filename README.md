@@ -2,7 +2,7 @@
 
 [![MIT license](https://img.shields.io/badge/License-MIT-black.svg)](https://lbesson.mit-license.org/)
 [![Python 3.6](https://img.shields.io/badge/python-3.6-black.svg)](https://www.python.org/downloads/release/python-360/)
-![Package version](https://img.shields.io/badge/version-0.1.1-blue.svg?cacheSeconds=2592000)
+![Package version](https://img.shields.io/badge/version-0.1.2-blue.svg?cacheSeconds=2592000)
 
 Zonal statistics on raster data
 ---
@@ -20,10 +20,10 @@ The following dependencies are installed, or upgraded, automatically.
 - GDAL
 - NumPy
 - tqdm
-- future
 - GeoPandas
 - Pandas
 - Bottleneck
+- six
 
 ### Installation
 
@@ -133,6 +133,9 @@ The default 'no data' value is 0, but it can be specified. Note that 'no data' v
 ```python
 >>> # To store the data as a distribution, use 'dist'.
 >>> df = zs.calculate('dist')
+>>>
+>>> # Melt the data into columns
+>>> df = zs.melt_dist(df)
 ```
 
 ### Testing
