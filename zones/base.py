@@ -3,10 +3,11 @@ import os
 from .errors import logger, ValuesFileError, StatsError, ZonesFileError
 from .stats import STAT_DICT
 
-import mpglue as gl
+from mpglue import raster_tools
 
 from osgeo import osr
 import pandas as pd
+import xarray as xr
 import geopandas as gpd
 import six
 
@@ -63,7 +64,10 @@ class ZonesMixin(object):
         Checks for file data type
 
         Args:
-            data_file
+            data_file (GeoDataFrame or image file or Xarray Dataset)
+
+                *If `data_file` is an `Xarray.Dataset` or `Xarray.DataArray`, `data_file` must have the
+                following attributes:  projection (str) and res (tuple)
 
         Returns:
             data_file (GeoDataFrame)
@@ -73,14 +77,41 @@ class ZonesMixin(object):
             return data_file, None
         else:
 
-            file_extension = os.path.splitext(os.path.split(data_file)[1])[1].lower().strip()
+            if isinstance(data_file, xr.Dataset) or isinstance(data_file, xr.DataArray):
 
-            if file_extension in ['.shp', '.gpkg']:
-                return gpd.read_file(data_file), None
-            elif file_extension == '.csv':
-                return pd.read_csv(data_file), None
+                if isinstance(data_file, xr.Dataset):
+                    array_shape = data_file['bands'].shape
+                else:
+                    array_shape = data_file.shape
+
+                image_info = raster_tools.ImageInfo()
+
+                if len(array_shape) > 2:
+
+                    image_info.update_info(data=data_file,
+                                           bands=array_shape[0],
+                                           projection=data_file.projection,
+                                           cellY=data_file.res[0])
+
+                else:
+
+                    image_info.update_info(data=data_file,
+                                           bands=1,
+                                           projection=data_file.projection,
+                                           cellY=data_file.res[0])
+
+                return None, image_info
+
             else:
-                return None, gl.ropen(data_file)
+
+                file_extension = os.path.splitext(os.path.split(data_file)[1])[1].lower().strip()
+
+                if file_extension in ['.shp', '.gpkg']:
+                    return gpd.read_file(data_file), None
+                elif file_extension == '.csv':
+                    return pd.read_csv(data_file), None
+                else:
+                    return None, raster_tools.ropen(data_file)
 
     def prepare_files(self, zones, values):
 
@@ -160,8 +191,10 @@ class ZonesMixin(object):
 
         if self.values_src:
 
-            self.values_src.close()
-            self.values_src = None
+            if hasattr(self.values_src, 'close'):
+
+                self.values_src.close()
+                self.values_src = None
 
     def _prepare_proj4(self):
 
@@ -185,10 +218,12 @@ class ZonesMixin(object):
             stats (list)
         """
 
-        if not os.path.isfile(self.values):
+        if isinstance(self.values, str):
 
-            logger.error('  The values file does not exist.')
-            raise ValuesFileError
+            if not os.path.isfile(self.values):
+
+                logger.error('  The values file does not exist.')
+                raise ValuesFileError
 
         if not isinstance(self.zones, gpd.GeoDataFrame):
 

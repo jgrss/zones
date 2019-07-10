@@ -78,26 +78,116 @@ def rasterize(geom, proj4, image_src, image_name):
                                 #cols=xcount,
                                 #d_type='float32')
 
-    src = raster_tools.warp(image_name,
-                            '',
-                            format='MEM',
-                            out_proj=image_src.projection,
-                            multithread=True,
-                            outputBounds=[left, top-(ycount*image_src.cellY), left+(xcount*image_src.cellY), top],
-                            cell_size=image_src.cellY,
-                            d_type='float32',
-                            return_datasource=True,
-                            warpMemoryLimit=256)
+    if isinstance(image_name, str):
 
-    image_array = src.read(bands2open=-1)
+        src = raster_tools.warp(image_name,
+                                '',
+                                format='MEM',
+                                out_proj=image_src.projection,
+                                multithread=True,
+                                outputBounds=[left, top-(ycount*image_src.cellY), left+(xcount*image_src.cellY), top],
+                                cell_size=image_src.cellY,
+                                d_type='float32',
+                                return_datasource=True,
+                                warpMemoryLimit=256)
 
-    src.close_file()
-    src = None
+        image_array = src.read(bands2open=-1)
+
+        src.close_file()
+        src = None
+
+    else:
+
+        image_array = image_src.data.sel(y=slice(top,
+                                                 top - (ycount * image_src.cellY)),
+                                         x=slice(left,
+                                                 left + (xcount * image_src.cellY))).values
 
     return poly_array, image_array
 
 
-def worker(didx, df_row, stat, proj4, raster_value, no_data, verbose, n):
+def update_dict(didx, zones_dict, image_array, stats, band, no_data, image_bands):
+
+    """
+    Updates the stats dictionary
+    """
+
+    if len(image_array.shape) < 3:
+
+        for sidx, stat in enumerate(stats):
+
+            if stat == 'dist':
+
+                zones_dict[1][didx] = ';'.join(list(map('{:.4f}'.format,
+                                                        image_array[image_array != no_data].tolist())))
+
+            else:
+
+                stat_func = STAT_DICT[stat]
+
+                # TODO: if zones are not unique
+                if stat == 'mode':
+                    zones_dict[1][didx][sidx] = float(stat_func(image_array).mode)
+                elif stat == 'nanmode':
+                    zones_dict[1][didx][sidx] = float(stat_func(image_array[np.where(~np.isnan(image_array))]).mode)
+                else:
+                    zones_dict[1][didx][sidx] = stat_func(image_array)
+
+    else:
+
+        if isinstance(band, int):
+
+            for sidx, stat in enumerate(stats):
+
+                if stat == 'dist':
+
+                    zones_dict[band][didx] = ';'.join(list(map('{:.4f}'.format,
+                                                                    image_array[bidx - 1][image_array[bidx - 1] != no_data].tolist())))
+
+                else:
+
+                    stat_func = STAT_DICT[stat]
+
+                    # TODO: if zones are not unique
+                    if stat == 'mode':
+                        zones_dict[band][didx][sidx] = float(stat_func(image_array[band - 1]).mode)
+                    elif stat == 'nanmode':
+                        zones_dict[band][didx][sidx] = float(stat_func(image_array[band - 1][np.where(~np.isnan(image_array))]).mode)
+                    else:
+                        zones_dict[band][didx][sidx] = stat_func(image_array[band - 1])
+
+        else:
+
+            for bidx in range(1, image_bands + 1):
+
+                for sidx, stat in enumerate(stats):
+
+                    if stat == 'dist':
+
+                        zones_dict[bidx][didx] = ';'.join(list(map('{:.4f}'.format,
+                                                                   image_array[bidx - 1][image_array[bidx - 1] != no_data].tolist())))
+
+                    else:
+
+                        stat_func = STAT_DICT[stat]
+
+                        # TODO: if zones are not unique
+                        if stat == 'mode':
+                            zones_dict[bidx][didx][sidx] = float(stat_func(image_array[bidx - 1]).mode)
+                        elif stat == 'nanmode':
+                            zones_dict[bidx][didx][sidx] = float(stat_func(image_array[bidx - 1][np.where(~np.isnan(image_array))]).mode)
+                        else:
+                            zones_dict[bidx][didx][sidx] = stat_func(image_array[bidx - 1])
+
+    return zones_dict
+
+
+def worker(didx, df_row, stat, proj4, raster_value, no_data, verbose, n, values):
+
+    if isinstance(values, str):
+        values_src = raster_tools.ropen(values)
+    else:
+        values_src = values
 
     if verbose > 1:
 
@@ -112,7 +202,7 @@ def worker(didx, df_row, stat, proj4, raster_value, no_data, verbose, n):
         return didx, np.nan
 
     # Rasterize the data
-    poly_array, image_array = rasterize(geom, proj4, values_src_g, values_df_g)
+    poly_array, image_array = rasterize(geom, proj4, values_src, values)
 
     if isinstance(raster_value, int):
 
@@ -165,16 +255,14 @@ def worker(didx, df_row, stat, proj4, raster_value, no_data, verbose, n):
         else:
             values = stat_func(image_array)
 
+    if isinstance(values, str):
+        values_src.close()
+        values_src = None
+
     return didx, values
 
 
-def calc_parallel(stats, proj4, raster_value, no_data, verbose, n, zones_df, values_src, values, n_jobs):
-
-    global values_src_g
-    global values_df_g
-
-    values_src_g = values_src
-    values_df_g = values
+def calc_parallel(stats, proj4, raster_value, no_data, verbose, n, zones_df, values, n_jobs):
 
     results = Parallel(n_jobs=n_jobs)(delayed(worker)(didx,
                                                       dfrow,
@@ -183,7 +271,8 @@ def calc_parallel(stats, proj4, raster_value, no_data, verbose, n, zones_df, val
                                                       raster_value,
                                                       no_data,
                                                       verbose,
-                                                      n)
+                                                      n,
+                                                      values)
                                       for didx, dfrow in zones_df.iterrows())
 
     return dict(results)
@@ -193,7 +282,7 @@ class RasterStats(ZonesMixin):
 
     """
     Args:
-        values (str): The raster values file. Can be float or categorical raster.
+        values (str or xarray): The raster values file. Can be float or categorical raster.
         zones (str or GeoDataFrame): The zones file.
             Accepted types are:
                 str: vector file (e.g., shapefile, or geopackage)
@@ -264,7 +353,6 @@ class RasterStats(ZonesMixin):
                                               self.verbose,
                                               n,
                                               self.zones_df,
-                                              self.values_src,
                                               self.values,
                                               self.n_jobs)
 
@@ -325,69 +413,10 @@ class RasterStats(ZonesMixin):
                         if np.isnan(bn.nanmax(image_array)):
                             continue
 
-                if len(image_array.shape) < 3:
-
-                    for sidx, stat in enumerate(stats):
-
-                        if stat == 'dist':
-
-                            self.zone_values[1][didx] = ';'.join(list(map('{:.4f}'.format,
-                                                                          image_array[image_array != self.no_data].tolist())))
-
-                        else:
-
-                            stat_func = STAT_DICT[stat]
-
-                            # TODO: if zones are not unique
-                            if stat == 'mode':
-                                self.zone_values[1][didx][sidx] = float(stat_func(image_array).mode)
-                            elif stat == 'nanmode':
-                                self.zone_values[1][didx][sidx] = float(stat_func(image_array[np.where(~np.isnan(image_array))]).mode)
-                            else:
-                                self.zone_values[1][didx][sidx] = stat_func(image_array)
-
-                else:
-
-                    if isinstance(self.band, int):
-
-                        for sidx, stat in enumerate(stats):
-
-                            if stat == 'dist':
-
-                                self.zone_values[self.band][didx] = ';'.join(list(map('{:.4f}'.format,
-                                                                                      image_array[bidx-1][image_array[bidx-1] != self.no_data].tolist())))
-
-                            else:
-
-                                stat_func = STAT_DICT[stat]
-
-                                # TODO: if zones are not unique
-                                if stat == 'mode':
-                                    self.zone_values[self.band][didx][sidx] = float(stat_func(image_array[self.band-1]).mode)
-                                elif stat == 'nanmode':
-                                    self.zone_values[self.band][didx][sidx] = float(stat_func(image_array[self.band-1][np.where(~np.isnan(image_array))]).mode)
-                                else:
-                                    self.zone_values[self.band][didx][sidx] = stat_func(image_array[self.band-1])
-
-                    else:
-
-                        for bidx in range(1, self.values_src.bands+1):
-
-                            for sidx, stat in enumerate(stats):
-
-                                if stat == 'dist':
-
-                                    self.zone_values[bidx][didx] = ';'.join(list(map('{:.4f}'.format,
-                                                                                     image_array[bidx-1][image_array[bidx-1] != self.no_data].tolist())))
-
-                                else:
-
-                                    stat_func = STAT_DICT[stat]
-
-                                    # TODO: if zones are not unique
-                                    if stat == 'mode':
-                                        self.zone_values[bidx][didx][sidx] = float(stat_func(image_array[bidx-1]).mode)
-                                    elif stat == 'nanmode':
-                                        self.zone_values[bidx][didx][sidx] = float(stat_func(image_array[bidx-1][np.where(~np.isnan(image_array))]).mode)
-                                    else:
-                                        self.zone_values[bidx][didx][sidx] = stat_func(image_array[bidx-1])
+                self.zone_values = update_dict(didx,
+                                               self.zone_values,
+                                               image_array,
+                                               stats,
+                                               self.band,
+                                               self.no_data,
+                                               self.values_src.bands)

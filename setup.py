@@ -4,7 +4,7 @@ from distutils.core import setup
 import numpy as np
 
 
-__version__ = '0.1.2dev'
+__version__ = '0.1.3dev'
 
 lib_name = 'zones'
 maintainer = 'Jordan Graesser'
@@ -22,6 +22,7 @@ required_packages = ['GDAL',
                      'numpy',
                      'tqdm',
                      'geopandas',
+                     'xarray',
                      'pandas',
                      'bottleneck',
                      'six']
