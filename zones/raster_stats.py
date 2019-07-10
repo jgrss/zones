@@ -9,6 +9,7 @@ from mpglue import raster_tools
 import numpy as np
 from osgeo import gdal, ogr, osr
 import shapely
+from shapely.geometry import Polygon
 import bottleneck as bn
 
 from joblib import Parallel, delayed
@@ -363,6 +364,15 @@ class RasterStats(ZonesMixin):
                 geom = df_row.geometry
 
                 if not geom:
+                    continue
+
+                image_bounds = Polygon([(self.values_src.left, self.values_src.top),
+                                        (self.values_src.right, self.values_src.top),
+                                        (self.values_src.right, self.values_src.bottom),
+                                        (self.values_src.left, self.values_src.bottom)])
+
+                # Check if the geometry is within the image bounds
+                if not geom.within(image_bounds):
                     continue
 
                 # Rasterize the data

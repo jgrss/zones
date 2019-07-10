@@ -91,14 +91,22 @@ class ZonesMixin(object):
                     image_info.update_info(data=data_file,
                                            bands=array_shape[0],
                                            projection=data_file.projection,
-                                           cellY=data_file.res[0])
+                                           cellY=data_file.res[0],
+                                           left=data_file.x.values[0],
+                                           right=data_file.x.values[-1],
+                                           bottom=data_file.y.values[-1],
+                                           top=data_file.y.values[0])
 
                 else:
 
                     image_info.update_info(data=data_file,
                                            bands=1,
                                            projection=data_file.projection,
-                                           cellY=data_file.res[0])
+                                           cellY=data_file.res[0],
+                                           left=data_file.x.values[0],
+                                           right=data_file.x.values[-1],
+                                           bottom=data_file.y.values[-1],
+                                           top=data_file.y.values[0])
 
                 return None, image_info
 
