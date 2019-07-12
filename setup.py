@@ -4,7 +4,7 @@ from distutils.core import setup
 import numpy as np
 
 
-__version__ = '0.1.4dev'
+__version__ = '0.1.5dev'
 
 lib_name = 'zones'
 maintainer = 'Jordan Graesser'

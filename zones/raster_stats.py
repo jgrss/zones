@@ -8,6 +8,7 @@ from mpglue import raster_tools
 
 import numpy as np
 from osgeo import gdal, ogr, osr
+import xarray as xr
 import shapely
 from shapely.geometry import Polygon
 import bottleneck as bn
@@ -99,10 +100,15 @@ def rasterize(geom, proj4, image_src, image_name):
 
     else:
 
-        image_array = image_src.data.sel(y=slice(top,
-                                                 top - (ycount * image_src.cellY)),
-                                         x=slice(left,
-                                                 left + (xcount * image_src.cellY))).values
+        if isinstance(image_src.data, xr.core.dataset.Dataset):
+
+            image_array = image_src.data['bands'].sel(y=slice(top, top - (ycount * image_src.cellY)),
+                                                      x=slice(left, left + (xcount * image_src.cellY))).values
+
+        else:
+
+            image_array = image_src.data.sel(y=slice(top, top - (ycount * image_src.cellY)),
+                                             x=slice(left, left + (xcount * image_src.cellY))).values
 
     return poly_array, image_array
 
