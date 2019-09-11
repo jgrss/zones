@@ -2,6 +2,7 @@ import os
 
 from .errors import logger, ValuesFileError, StatsError, ZonesFileError
 from .stats import STAT_DICT
+from .helpers import create_dictionary
 
 from mpglue import raster_tools
 
@@ -149,23 +150,9 @@ class ZonesMixin(object):
             return None
         else:
 
-            zone_values = dict()
-
-            if self.n_bands > 0:
-
-                for bidx in range(1, self.n_bands+1):
-
-                    zone_values[bidx] = dict()
-
-                    for idx, dfr in self.zones_df.iterrows():
-                        zone_values[bidx][idx] = [0.0] * len(self.stats)
-
-            else:
-
-                for idx, dfr in self.zones_df.iterrows():
-                    zone_values[idx] = [0.0] * len(self.stats)
-
-            return zone_values
+            return create_dictionary(self.zones_df.shape[0],
+                                     len(self.stats),
+                                     self.n_bands)
 
     def finalize_dataframe(self):
 
@@ -181,6 +168,7 @@ class ZonesMixin(object):
                 for bidx in range(1, self.n_bands+1):
 
                     values_df_ = pd.DataFrame.from_dict(self.zone_values[bidx], orient='index')
+
                     values_df_.columns = ('_bd{:d},'.format(bidx).join(self.stats) + '_bd{:d}'.format(bidx)).split(',')
 
                     if bidx == 1:

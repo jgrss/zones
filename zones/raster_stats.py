@@ -3,6 +3,7 @@ from __future__ import division
 from .base import ZonesMixin
 from .errors import logger
 from .stats import STAT_DICT
+from .helpers import merge_dictionary_keys
 
 from mpglue import raster_tools
 
@@ -60,7 +61,7 @@ def rasterize(geom, proj4, image_src, image_name):
     try:
         target_ds = gdal.GetDriverByName('MEM').Create('', xcount, ycount, 1, gdal.GDT_Byte)
     except:
-        return None, None
+        return None, None, None, None, None, None
 
     target_ds.SetGeoTransform([left, image_src.cellY, 0., top, 0., -image_src.cellY])
     target_ds.SetProjection(target_sr.ExportToWkt())
@@ -80,6 +81,9 @@ def rasterize(geom, proj4, image_src, image_name):
                                 #cols=xcount,
                                 #d_type='float32')
 
+    bottom = top - (ycount * image_src.cellY)
+    right = left + (xcount * image_src.cellY)
+
     if isinstance(image_name, str):
 
         src = raster_tools.warp(image_name,
@@ -87,7 +91,7 @@ def rasterize(geom, proj4, image_src, image_name):
                                 format='MEM',
                                 out_proj=image_src.projection,
                                 multithread=True,
-                                outputBounds=[left, top-(ycount*image_src.cellY), left+(xcount*image_src.cellY), top],
+                                outputBounds=[left, bottom, right, top],
                                 cell_size=image_src.cellY,
                                 d_type='float32',
                                 return_datasource=True,
@@ -102,15 +106,15 @@ def rasterize(geom, proj4, image_src, image_name):
 
         if isinstance(image_src.data, xr.core.dataset.Dataset):
 
-            image_array = image_src.data['bands'].sel(y=slice(top, top - (ycount * image_src.cellY)),
-                                                      x=slice(left, left + (xcount * image_src.cellY))).values
+            image_array = image_src.data['bands'].sel(y=slice(top, bottom),
+                                                      x=slice(left, right)).values
 
         else:
 
-            image_array = image_src.data.sel(y=slice(top, top - (ycount * image_src.cellY)),
-                                             x=slice(left, left + (xcount * image_src.cellY))).values
+            image_array = image_src.data.sel(y=slice(top, bottom),
+                                             x=slice(left, bottom)).values
 
-    return poly_array, image_array
+    return poly_array, image_array, left, top, right, bottom
 
 
 def update_dict(didx, zones_dict, image_array, stats, band, no_data, image_bands):
@@ -209,7 +213,7 @@ def worker(didx, df_row, stat, proj4, raster_value, no_data, verbose, n, values)
         return didx, np.nan
 
     # Rasterize the data
-    poly_array, image_array = rasterize(geom, proj4, values_src, values)
+    poly_array, image_array, left, top, right, bottom = rasterize(geom, proj4, values_src, values)
 
     if isinstance(raster_value, int):
 
@@ -242,14 +246,14 @@ def worker(didx, df_row, stat, proj4, raster_value, no_data, verbose, n, values)
 
             null_idx = np.where(poly_array == 0)
 
-            if null_idx[0].size > 0:
+            if null_idx[0].shape[0] > 0:
                 image_array[null_idx] = no_data
 
             if any(['nan' in x for x in stat]):
 
                 no_data_idx = np.where(image_array == no_data)
 
-                if no_data_idx[0].size > 0:
+                if no_data_idx[0].shape[0] > 0:
                     image_array[no_data_idx] = np.nan
 
                 if np.isnan(bn.nanmax(image_array)):
@@ -266,23 +270,25 @@ def worker(didx, df_row, stat, proj4, raster_value, no_data, verbose, n, values)
         values_src.close()
         values_src = None
 
-    return didx, values
+    return np.array([didx, values], dtype='float32')
 
 
 def calc_parallel(stats, proj4, raster_value, no_data, verbose, n, zones_df, values, n_jobs):
 
-    results = Parallel(n_jobs=n_jobs)(delayed(worker)(didx,
-                                                      dfrow,
-                                                      stats[0],
-                                                      proj4,
-                                                      raster_value,
-                                                      no_data,
-                                                      verbose,
-                                                      n,
-                                                      values)
-                                      for didx, dfrow in zones_df.iterrows())
+    results = Parallel(n_jobs=n_jobs,
+                       max_nbytes=None)(delayed(worker)(didx,
+                                                        dfrow,
+                                                        stats[0],
+                                                        proj4,
+                                                        raster_value,
+                                                        no_data,
+                                                        verbose,
+                                                        n,
+                                                        values)
+                                        for didx, dfrow in zones_df.iterrows())
 
-    return dict(results)
+    # TODO: for now, only one band is supported
+    return {1: merge_dictionary_keys(np.array(results, dtype='float64'))}
 
 
 class RasterStats(ZonesMixin):
@@ -353,15 +359,15 @@ class RasterStats(ZonesMixin):
 
         if (self.n_jobs != 1) and (len(self.stats) == 1):
 
-            self.zones_values = calc_parallel(stats,
-                                              proj4,
-                                              self.raster_value,
-                                              self.no_data,
-                                              self.verbose,
-                                              n,
-                                              self.zones_df,
-                                              self.values,
-                                              self.n_jobs)
+            self.zone_values = calc_parallel(stats,
+                                             proj4,
+                                             self.raster_value,
+                                             self.no_data,
+                                             self.verbose,
+                                             n,
+                                             self.zones_df,
+                                             self.values,
+                                             self.n_jobs)
 
         else:
 
@@ -372,17 +378,17 @@ class RasterStats(ZonesMixin):
                 if not geom:
                     continue
 
-                image_bounds = Polygon([(self.values_src.left, self.values_src.top),
-                                        (self.values_src.right, self.values_src.top),
-                                        (self.values_src.right, self.values_src.bottom),
-                                        (self.values_src.left, self.values_src.bottom)])
-
-                # Check if the geometry is within the image bounds
-                if not geom.within(image_bounds):
-                    continue
+                # image_bounds = Polygon([(self.values_src.left, self.values_src.top),
+                #                         (self.values_src.right, self.values_src.top),
+                #                         (self.values_src.right, self.values_src.bottom),
+                #                         (self.values_src.left, self.values_src.bottom)])
+                #
+                # # Check if the geometry is within the image bounds
+                # if not geom.within(image_bounds):
+                #     continue
 
                 # Rasterize the data
-                poly_array, image_array = rasterize(geom, proj4, self.values_src, self.values)
+                poly_array, image_array, left, top, right, bottom = rasterize(geom, proj4, self.values_src, self.values)
 
                 if isinstance(self.raster_value, int):
 
@@ -423,7 +429,7 @@ class RasterStats(ZonesMixin):
 
                         no_data_idx = np.where(image_array == self.no_data)
 
-                        if no_data_idx[0].size > 0:
+                        if no_data_idx[0].shape[0] > 0:
                             image_array[no_data_idx] = np.nan
 
                         if np.isnan(bn.nanmax(image_array)):

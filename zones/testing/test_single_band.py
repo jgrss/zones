@@ -17,6 +17,25 @@ def test_01_single():
 
     raster, vector = load_01_single()
     zs = RasterStats(raster, vector, verbose=0)
+
+    df = zs.calculate('sum')
+
+    assert int(df.loc[0, 'sum_bd1']) == feat01.sum()
+    logger.info('  Band 1 sum for the first polygon OK')
+    assert int(df.loc[1, 'sum_bd1']) == feat02.sum()
+    logger.info('  Band 1 sum for the second polygon OK')
+    assert int(df.loc[2, 'sum_bd1']) == feat03.sum()
+    logger.info('  Band 1 sum for the third polygon OK')
+
+    df = zs.calculate('mean')
+
+    assert round(df.loc[0, 'mean_bd1'], 2) == round(feat01.mean(), 2)
+    logger.info('  Band 1 mean for the first polygon OK')
+    assert round(df.loc[1, 'mean_bd1'], 2) == round(feat02.mean(), 2)
+    logger.info('  Band 1 mean for the second polygon OK')
+    assert round(df.loc[2, 'mean_bd1'], 2) == round(feat03.mean(), 2)
+    logger.info('  Band 1 mean for the third polygon OK')
+
     df = zs.calculate(['sum', 'mean'])
 
     assert int(df.loc[0, 'sum_bd1']) == feat01.sum()

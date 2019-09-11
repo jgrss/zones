@@ -1,10 +1,12 @@
 import setuptools
 from distutils.core import setup
+from distutils.extension import Extension
+from Cython.Build import cythonize
 
 import numpy as np
 
 
-__version__ = '0.1.5dev'
+__version__ = '0.1.6'
 
 lib_name = 'zones'
 maintainer = 'Jordan Graesser'
@@ -37,7 +39,16 @@ def get_package_data():
                       'datasets/vector/*.prj',
                       'datasets/vector/*.qpj',
                       'datasets/vector/*.shp',
-                      'datasets/vector/*.shx']}
+                      'datasets/vector/*.shx',
+                      'helpers/*.so',
+                      'helpers/*.cpp']}
+
+
+def get_extensions():
+
+    return [Extension('*',
+                      sources=['zones/helpers/_dictionary.pyx'],
+                      language='c++')]
 
 
 def get_packages():
@@ -57,6 +68,7 @@ def setup_package():
                     long_description=long_description,
                     package_data=get_package_data(),
                     packages=get_packages(),
+                    ext_modules=cythonize(get_extensions()),
                     zip_safe=False,
                     download_url=git_url,
                     install_requires=required_packages,

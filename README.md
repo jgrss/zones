@@ -2,7 +2,7 @@
 
 [![MIT license](https://img.shields.io/badge/License-MIT-black.svg)](https://lbesson.mit-license.org/)
 [![Python 3.6](https://img.shields.io/badge/python-3.6-black.svg)](https://www.python.org/downloads/release/python-360/)
-![Package version](https://img.shields.io/badge/version-0.1.5-blue.svg?cacheSeconds=2592000)
+![Package version](https://img.shields.io/badge/version-0.1.6-blue.svg?cacheSeconds=2592000)
 
 Zonal statistics on raster data
 ---
@@ -34,7 +34,7 @@ Install `MpGlue`
 ```commandline
 > git clone https://github.com/jgrss/mpglue
 > cd mpglue/
-> python3.6 setup.py install --user
+> python3 setup.py install --user
 > cd ../
 ```
 
@@ -43,9 +43,9 @@ Install `zones`
 ```commandline
 > git clone https://github.com/jgrss/zones
 > cd zones/
-> python3.6 setup.py install --user
+> python3 setup.py install --user
 > cd ~
-> python3.6 -c "import zones;zones.test_raster()"
+> python3 -c "import zones;zones.test_raster()"
 ```
 
 ### Zonal stats with polygon and raster data
