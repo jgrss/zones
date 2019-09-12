@@ -35,12 +35,6 @@ Install `zones`
 > pip3 install --user git+https://github.com/jgrss/zones
 ```
 
-Install `MpGlue`
-
-```commandline
-> pip3 install --user git+https://github.com/jgrss/mpglue
-```
-
 #### Test the installation
 
 ```commandline
