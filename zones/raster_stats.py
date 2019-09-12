@@ -20,7 +20,7 @@ from tqdm import tqdm
 shapely.speedups.enable()
 
 
-def rasterize(geom, proj4, image_src, image_name):
+def rasterize(geom, proj4, image_src, image_name, open_bands):
 
     """
     Rasterizes a polygon geometry
@@ -97,7 +97,7 @@ def rasterize(geom, proj4, image_src, image_name):
                                 return_datasource=True,
                                 warpMemoryLimit=256)
 
-        image_array = src.read(bands2open=-1)
+        image_array = src.read(bands=open_bands)
 
         src.close_file()
         src = None
@@ -193,7 +193,9 @@ def update_dict(didx, zones_dict, image_array, stats, band, no_data, image_bands
     return zones_dict
 
 
-def worker(didx, df_row, stat, proj4, raster_value, no_data, verbose, n, values):
+def worker(didx, df_row, stats, n_stats, proj4, raster_value, no_data, verbose, n, band, open_bands, values):
+
+    data_values = np.concatenate(([didx], np.zeros(n_stats, dtype='float64') + np.nan))
 
     if isinstance(values, str):
         values_src = raster_tools.ropen(values)
@@ -210,10 +212,10 @@ def worker(didx, df_row, stat, proj4, raster_value, no_data, verbose, n, values)
     geom = df_row.geometry
 
     if not geom:
-        return didx, np.nan
+        return data_values
 
     # Rasterize the data
-    poly_array, image_array, left, top, right, bottom = rasterize(geom, proj4, values_src, values)
+    poly_array, image_array, left, top, right, bottom = rasterize(geom, proj4, values_src, values, open_bands)
 
     if isinstance(raster_value, int):
 
@@ -221,7 +223,7 @@ def worker(didx, df_row, stat, proj4, raster_value, no_data, verbose, n, values)
 
         if image_array.max() == 0:
 
-            values = 0.0
+            data_values = 0.0
             return_early = True
 
     elif isinstance(raster_value, list):
@@ -235,13 +237,13 @@ def worker(didx, df_row, stat, proj4, raster_value, no_data, verbose, n, values)
 
         if image_array.max() == 0:
 
-            values = 0.0
+            data_values = 0.0
             return_early = True
 
     if not return_early:
 
         if not isinstance(poly_array, np.ndarray):
-            image_array = np.array([0], dtype='float32')
+            return data_values
         else:
 
             null_idx = np.where(poly_array == 0)
@@ -249,7 +251,7 @@ def worker(didx, df_row, stat, proj4, raster_value, no_data, verbose, n, values)
             if null_idx[0].shape[0] > 0:
                 image_array[null_idx] = no_data
 
-            if any(['nan' in x for x in stat]):
+            if any(['nan' in x for x in stats]):
 
                 no_data_idx = np.where(image_array == no_data)
 
@@ -257,38 +259,82 @@ def worker(didx, df_row, stat, proj4, raster_value, no_data, verbose, n, values)
                     image_array[no_data_idx] = np.nan
 
                 if np.isnan(bn.nanmax(image_array)):
-                    return didx, np.nan
+                    return data_values
 
-        stat_func = STAT_DICT[stat]
+        if len(image_array.shape) == 2:
 
-        if stat == 'mode':
-            values = float(stat_func(image_array).mode)
+            data_values = np.concatenate(([didx], np.zeros(n_stats, dtype='float64')))
+
+            for sidx, stat in enumerate(stats):
+
+                stat_func = STAT_DICT[stat]
+
+                if stat == 'mode':
+                    data_values_stat = float(stat_func(image_array).mode)
+                else:
+                    data_values_stat = stat_func(image_array)
+
+                data_values[1+sidx] = data_values_stat
+
         else:
-            values = stat_func(image_array)
+
+            data_values = np.concatenate(([didx], np.zeros(n_stats * values_src.bands, dtype='float64')))
+
+            for bdidx in range(0, values_src.bands):
+
+                for sidx, stat in enumerate(stats):
+
+                    stat_func = STAT_DICT[stat]
+
+                    if stat == 'mode':
+                        data_values_stat = float(stat_func(image_array[bdidx]).mode)
+                    else:
+                        data_values_stat = stat_func(image_array[bdidx])
+
+                    data_values[1+(bdidx*n_stats)+sidx] = data_values_stat
 
     if isinstance(values, str):
+
         values_src.close()
         values_src = None
 
-    return np.array([didx, values], dtype='float32')
+    return data_values
 
 
-def calc_parallel(stats, proj4, raster_value, no_data, verbose, n, zones_df, values, n_jobs):
+def calc_parallel(stats, proj4, raster_value, no_data, verbose, n, zones_df, values, band, open_bands, n_jobs):
+
+    n_stats = len(stats)
 
     results = Parallel(n_jobs=n_jobs,
                        max_nbytes=None)(delayed(worker)(didx,
                                                         dfrow,
-                                                        stats[0],
+                                                        stats,
+                                                        n_stats,
                                                         proj4,
                                                         raster_value,
                                                         no_data,
                                                         verbose,
                                                         n,
+                                                        band,
+                                                        open_bands,
                                                         values)
                                         for didx, dfrow in zones_df.iterrows())
 
-    # TODO: for now, only one band is supported
-    return {1: merge_dictionary_keys(np.array(results, dtype='float64'))}
+    if isinstance(band, int):
+        n_bands = 1
+    else:
+
+        if isinstance(values, str):
+
+            with raster_tools.ropen(values) as src_tmp:
+                n_bands = src_tmp.bands
+
+            src_tmp = None
+
+        else:
+            n_bands = values.bands
+
+    return merge_dictionary_keys(np.array(results, dtype='float64'), stats, n_bands)
 
 
 class RasterStats(ZonesMixin):
@@ -347,6 +393,7 @@ class RasterStats(ZonesMixin):
 
         self.stats = None
         self.zone_values = None
+        self.open_bands = self.band if isinstance(self.band, int) else -1
 
     def zone_iter(self, stats):
 
@@ -357,7 +404,7 @@ class RasterStats(ZonesMixin):
         if self.verbose > 0:
             logger.info('  Calculating statistics ...')
 
-        if (self.n_jobs != 1) and (len(self.stats) == 1):
+        if self.n_jobs != 1:
 
             self.zone_values = calc_parallel(stats,
                                              proj4,
@@ -367,6 +414,8 @@ class RasterStats(ZonesMixin):
                                              n,
                                              self.zones_df,
                                              self.values,
+                                             self.band,
+                                             self.open_bands,
                                              self.n_jobs)
 
         else:
@@ -388,7 +437,11 @@ class RasterStats(ZonesMixin):
                 #     continue
 
                 # Rasterize the data
-                poly_array, image_array, left, top, right, bottom = rasterize(geom, proj4, self.values_src, self.values)
+                poly_array, image_array, left, top, right, bottom = rasterize(geom,
+                                                                              proj4,
+                                                                              self.values_src,
+                                                                              self.values,
+                                                                              self.open_bands)
 
                 if isinstance(self.raster_value, int):
 

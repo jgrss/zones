@@ -160,7 +160,7 @@ class ZonesMixin(object):
 
             if isinstance(self.band, int):
 
-                values_df = pd.DataFrame.from_dict(self.zone_values, orient='index')
+                values_df = pd.DataFrame.from_dict(self.zone_values[1], orient='index')
                 values_df.columns = ('_bd{:d},'.format(self.band).join(self.stats) + '_bd{:d}'.format(self.band)).split(',')
 
             else:
@@ -168,7 +168,6 @@ class ZonesMixin(object):
                 for bidx in range(1, self.n_bands+1):
 
                     values_df_ = pd.DataFrame.from_dict(self.zone_values[bidx], orient='index')
-
                     values_df_.columns = ('_bd{:d},'.format(bidx).join(self.stats) + '_bd{:d}'.format(bidx)).split(',')
 
                     if bidx == 1:

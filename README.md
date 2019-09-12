@@ -2,7 +2,7 @@
 
 [![MIT license](https://img.shields.io/badge/License-MIT-black.svg)](https://lbesson.mit-license.org/)
 [![Python 3.6](https://img.shields.io/badge/python-3.6-black.svg)](https://www.python.org/downloads/release/python-360/)
-![Package version](https://img.shields.io/badge/version-0.1.6-blue.svg?cacheSeconds=2592000)
+![Package version](https://img.shields.io/badge/version-0.1.7-blue.svg?cacheSeconds=2592000)
 
 Zonal statistics on raster data
 ---
@@ -115,12 +115,12 @@ The default 'no data' value is 0, but it can be specified. Note that 'no data' v
 
 #### Zones can be processed in parallel.
 
-> Currently, only one statistic is supported when `n_jobs` is not equal to 1.
+> Currently, only the `mean` and `sum` statistics are supported when `n_jobs` is not equal to 1.
 
 ```python
->>> # Process zones in parallel, using all available CPUs.
->>> zs = zones.RasterStats('values.tif', 'zones.shp', n_jobs=-1)
->>> zs.calculate('var')
+>>> # Process zones in parallel, using 8 CPUs.
+>>> zs = zones.RasterStats('values.tif', 'zones.shp', n_jobs=8, no_data=255, band=1)
+>>> zs.calculate('mean')
 ```
 
 ### Other methods
