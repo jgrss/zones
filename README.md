@@ -2,7 +2,7 @@
 
 [![MIT license](https://img.shields.io/badge/License-MIT-black.svg)](https://lbesson.mit-license.org/)
 [![Python 3.6](https://img.shields.io/badge/python-3.6-black.svg)](https://www.python.org/downloads/release/python-360/)
-![Package version](https://img.shields.io/badge/version-0.1.7-blue.svg?cacheSeconds=2592000)
+![Package version](https://img.shields.io/badge/version-0.1.8-blue.svg?cacheSeconds=2592000)
 
 Zonal statistics on raster data
 ---
@@ -29,22 +29,21 @@ The following dependencies are installed, or upgraded, automatically.
 
 #### Example on Linux
 
-Install `MpGlue`
-
-```commandline
-> git clone https://github.com/jgrss/mpglue
-> cd mpglue/
-> python3 setup.py install --user
-> cd ../
-```
-
 Install `zones`
 
 ```commandline
-> git clone https://github.com/jgrss/zones
-> cd zones/
-> python3 setup.py install --user
-> cd ~
+> pip3 install --user git+https://github.com/jgrss/zones
+```
+
+Install `MpGlue`
+
+```commandline
+> pip3 install --user git+https://github.com/jgrss/mpglue
+```
+
+#### Test the installation
+
+```commandline
 > python3 -c "import zones;zones.test_raster()"
 ```
 
