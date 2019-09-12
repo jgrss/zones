@@ -27,10 +27,6 @@ The following dependencies are installed, or upgraded, automatically.
 
 ### Installation
 
-#### Example on Linux
-
-Install `zones`
-
 ```commandline
 > pip3 install --user git+https://github.com/jgrss/zones
 ```
