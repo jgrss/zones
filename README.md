@@ -32,10 +32,14 @@ Clone and build
 ```commandline
 > git clone https://github.com/jgrss/zones.git
 > cd zones/
-> python3 setup.py build && python3 setup.py install
+> pip3 install --user .
+>
+> # Cleanup
+> cd ../
+> rm -rf zones/
 ```
 
-or install directly
+or install directly from GitHub
 
 ```commandline
 > pip3 install --user git+https://github.com/jgrss/zones
