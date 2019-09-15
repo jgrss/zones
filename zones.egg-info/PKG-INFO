@@ -1,0 +1,168 @@
+Metadata-Version: 1.2
+Name: zones
+Version: 0.1.9
+Summary: Zonal statistics on raster data
+Home-page: UNKNOWN
+Maintainer: Jordan Graesser
+Maintainer-email: 
+License: The MIT License (MIT)
+
+Copyright (c) 2018--Python zones
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+Download-URL: http://github.com/jgrss/zones.git
+Description: [](#mit-license)[](#python-3.6)[](#package-version)
+        
+        [![MIT license](https://img.shields.io/badge/License-MIT-black.svg)](https://lbesson.mit-license.org/)
+        [![Python 3.6](https://img.shields.io/badge/python-3.6-black.svg)](https://www.python.org/downloads/release/python-360/)
+        ![Package version](https://img.shields.io/badge/version-0.1.9-blue.svg?cacheSeconds=2592000)
+        
+        Zonal statistics on raster data
+        ---
+        
+        The `zones` library calculates summary statistics with vector and raster data. The library manages projections on-the-fly,
+        so there is no need to ensure consistency prior to running.  Statistics are processed per zone, so memory requirements
+        scale with the size of the vector polygons.
+        
+        ### Dependencies
+        
+        Data I/O is handled with [MpGlue](https://github.com/jgrss/mpglue).
+        
+        The following dependencies are installed, or upgraded, automatically.
+        
+        - GDAL
+        - NumPy
+        - tqdm
+        - GeoPandas
+        - Pandas
+        - Bottleneck
+        - six
+        
+        ### Installation
+        
+        ```commandline
+        > pip3 install --user git+https://github.com/jgrss/zones
+        ```
+        
+        #### Test the installation
+        
+        ```commandline
+        > python3 -c "import zones;zones.test_raster()"
+        ```
+        
+        ### Zonal stats with polygon and raster data
+        
+        ```python
+        >>> import zones
+        >>>
+        >>> zs = zones.RasterStats('values.tif', 'zones.shp', verbose=2)
+        >>>
+        >>> # One statistic
+        >>> df = zs.calculate('mean')
+        >>>
+        >>> # Multiple statistics
+        >>> df = zs.calculate(['nanmean', 'nansum'])
+        >>>
+        >>> # Save data to file
+        >>> df.to_file('stats.shp')
+        >>> df.to_csv('stats.csv')
+        ```
+        
+        For multi-band images, the default is to calculate all bands, but the raster band can be specified.
+        
+        ```python
+        # Calculate statistics for band 2
+        >>> zs = zones.RasterStats('values.tif', 'zones.shp', band=2)
+        >>> df = zs.calculate('var')
+        ```
+        
+        The default 'no data' value is 0, but it can be specified. Note that 'no data' values are only ignored if 'nanstats' are used.
+        
+        ```python
+        # Calculate statistics for band 3, ignoring values of 255
+        >>> zs = zones.RasterStats('values.tif', 'zones.shp', band=3, no_data=255)
+        >>> df = zs.calculate('nanmedian')
+        ```
+        
+        #### The zone data can also be a `GeoDataFrame` or any other vector format supported by `GeoPandas`.
+        
+        ```python
+        >>> import geopandas as gpd
+        >>>
+        >>> gdf = gpd.read_file('data.shp')
+        >>>
+        >>> zs = zones.RasterStats('values.tif', gdf)
+        >>> zs = zones.RasterStats('values.tif', 'zones.gpkg')
+        ```
+        
+        ### Zonal stats with polygon and vector point data
+        
+        ```python
+        >>> import zones
+        >>>
+        >>> zs = zones.PointStats('points.shp', 'zones.shp', 'field_name')
+        >>>
+        >>> df = zs.calculate(['nanmean', 'nansum'])
+        >>>
+        >>> # Save data to file
+        >>> df.to_file('stats.shp')
+        >>> df.to_csv('stats.csv')
+        >>>
+        >>> # Calculate the point mean where DN is equal to 1.
+        >>> zs = zones.PointStats('points.shp', 'zones.shp', 'field_name', query="DN == 1")
+        >>> df = zs.calculate('mean')
+        ```
+        
+        ### Parallel processing
+        
+        #### Zones can be processed in parallel.
+        
+        > Currently, only the `mean` and `sum` statistics are supported when `n_jobs` is not equal to 1.
+        
+        ```python
+        >>> # Process zones in parallel, using 8 CPUs.
+        >>> zs = zones.RasterStats('values.tif', 'zones.shp', n_jobs=8, no_data=255, band=1)
+        >>> zs.calculate('mean')
+        ```
+        
+        ### Other methods
+        
+        ```python
+        >>> # Get available stats
+        >>> print(zs.stats_avail)
+        ```
+        
+        ```python
+        >>> # To store the data as a distribution, use 'dist'.
+        >>> df = zs.calculate('dist')
+        >>>
+        >>> # Melt the data into columns
+        >>> df = zs.melt_dist(df)
+        ```
+        
+        ### Testing
+        
+        ```python
+        >>> import zones
+        >>> zones.test_raster()
+        ```
+        
+        ... should result in `If there were no assertion errors, the tests ran OK.`
+        
+Platform: UNKNOWN

@@ -1,0 +1,9 @@
+GDAL
+numpy
+tqdm
+geopandas
+xarray
+pandas
+bottleneck
+six
+git@ https://github.com/jgrss/mpglue/archive/master.zip

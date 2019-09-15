@@ -6,7 +6,7 @@ from Cython.Build import cythonize
 import numpy as np
 
 
-__version__ = '0.1.9'
+__version__ = '0.1.8'
 
 lib_name = 'zones'
 maintainer = 'Jordan Graesser'
@@ -27,8 +27,7 @@ required_packages = ['GDAL',
                      'xarray',
                      'pandas',
                      'bottleneck',
-                     'six',
-                     'git+https://github.com/jgrss/mpglue']
+                     'six'
 
 
 def get_package_data():
