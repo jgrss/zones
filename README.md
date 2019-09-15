@@ -27,6 +27,16 @@ The following dependencies are installed, or upgraded, automatically.
 
 ### Installation
 
+Clone and build
+
+```commandline
+> git clone https://github.com/jgrss/zones.git
+> cd zones/
+> python3 setup.py build && python3 setup.py install
+```
+
+or install directly
+
 ```commandline
 > pip3 install --user git+https://github.com/jgrss/zones
 ```

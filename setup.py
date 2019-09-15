@@ -27,7 +27,7 @@ required_packages = ['GDAL',
                      'xarray',
                      'pandas',
                      'bottleneck',
-                     'six'
+                     'six']
 
 
 def get_package_data():
