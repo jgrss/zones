@@ -8,7 +8,7 @@ Zonal statistics on raster data
 ---
 
 The `zones` library calculates summary statistics with vector and raster data. The library manages projections on-the-fly,
-so there is no need to ensure consistency prior to running.  Statistics are processed per zone, so memory requirements
+so there is no need to ensure consistency prior to running. Statistics are processed per zone, so memory requirements
 scale with the size of the vector polygons.
 
 ### Dependencies
