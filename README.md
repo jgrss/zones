@@ -13,10 +13,9 @@ scale with the size of the vector polygons.
 
 ### Dependencies
 
-Data I/O is handled with [MpGlue](https://github.com/jgrss/mpglue).
-
 The following dependencies are installed, or upgraded, automatically.
 
+- Rasterio
 - GDAL
 - NumPy
 - tqdm
