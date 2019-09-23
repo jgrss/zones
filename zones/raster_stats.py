@@ -20,6 +20,74 @@ from tqdm import tqdm
 shapely.speedups.enable()
 
 
+def _merge_dicts(dict1, dict2):
+
+    dict3 = dict1.copy()
+    dict3.update(dict2)
+
+    return dict3
+
+
+def warp(input_image,
+         output_image,
+         out_proj=None,
+         in_proj=None,
+         cell_size=0,
+         **kwargs):
+
+    """
+    Warp transforms a dataset
+
+    Args:
+        input_image (str): The image to warp.
+        output_image (str): The output image.
+        out_proj (Optional[str]): The output proj4 projection code.
+        in_proj (Optional[str]): An input projection string. Default is None.
+        cell_size (Optional[float]): The output cell size. Default is 0.
+        kwargs:
+            format=None, outputBounds=None (minX, minY, maxX, maxY),
+            outputBoundsSRS=None, targetAlignedPixels=False,
+             width=0, height=0, srcAlpha=False, dstAlpha=False, warpOptions=None,
+             errorThreshold=None, warpMemoryLimit=None,
+             creationOptions=None, outputType=0, workingType=0,
+             resampleAlg=resample_dict[resample], srcNodata=None, dstNodata=None,
+             multithread=False, tps=False, rpc=False, geoloc=False,
+             polynomialOrder=None, transformerOptions=None, cutlineDSName=None,
+             cutlineLayer=None, cutlineWhere=None, cutlineSQL=None,
+             cutlineBlend=None, cropToCutline=False, copyMetadata=True,
+             metadataConflictValue=None, setColorInterpretation=False,
+             callback=None, callback_data=None
+             E.g.,
+                creationOptions=['GDAL_CACHEMAX=256', 'TILED=YES']
+
+    Returns:
+        None, writes to `output_image'.
+    """
+
+    cell_size_ = (cell_size, -cell_size)
+
+    awargs = _merge_dicts(dict(srcSRS=in_proj,
+                               dstSRS=out_proj,
+                               xRes=cell_size_[0],
+                               yRes=cell_size_[1],
+                               outputType=gdal.GDT_Float32,
+                               resampleAlg=gdal.GRA_NearestNeighbour),
+                          kwargs)
+
+    warp_options = gdal.WarpOptions(**awargs)
+
+    try:
+
+        out_ds = gdal.Warp(output_image,
+                           input_image,
+                           options=warp_options)
+
+    except:
+        out_ds = None
+
+    return out_ds
+
+
 def rasterize(geom, proj4, image_src, image_name, open_bands):
 
     """
@@ -35,7 +103,7 @@ def rasterize(geom, proj4, image_src, image_name, open_bands):
 
     # Transform the geometry
     target_sr = osr.SpatialReference()
-    target_sr.ImportFromWkt(image_src.projection)
+    target_sr.ImportFromWkt(image_src.crs)
     transform = osr.CoordinateTransformation(sp_ref, target_sr)
     gdal_geom = ogr.CreateGeometryFromWkt(geom.to_wkt())
     gdal_geom.Transform(transform)
@@ -54,8 +122,8 @@ def rasterize(geom, proj4, image_src, image_name, open_bands):
     feature.SetField('Value', 1)
     lyr.CreateFeature(feature)
 
-    xcount = int(round((right - left) / image_src.cellY))
-    ycount = int(round((top - bottom) / image_src.cellY))
+    xcount = int(round((right - left) / image_src.res[0]))
+    ycount = int(round((top - bottom) / image_src.res[0]))
 
     # Create a raster to rasterize into.
     try:
@@ -63,7 +131,7 @@ def rasterize(geom, proj4, image_src, image_name, open_bands):
     except:
         return None, None, None, None, None, None
 
-    target_ds.SetGeoTransform([left, image_src.cellY, 0., top, 0., -image_src.cellY])
+    target_ds.SetGeoTransform([left, image_src.res[0], 0., top, 0., -image_src.res[0]])
     target_ds.SetProjection(target_sr.ExportToWkt())
 
     # Rasterize
@@ -74,33 +142,76 @@ def rasterize(geom, proj4, image_src, image_name, open_bands):
     datasource = None
     target_ds = None
 
-    #image_array = image_src.read(bands2open=-1,
-                                #x=left,
-                                #y=top,
-                                #rows=ycount,
-                                #cols=xcount,
-                                #d_type='float32')
-
-    bottom = top - (ycount * image_src.cellY)
-    right = left + (xcount * image_src.cellY)
+    bottom = top - (ycount * image_src.res[0])
+    right = left + (xcount * image_src.res[0])
 
     if isinstance(image_name, str):
 
-        src = raster_tools.warp(image_name,
-                                '',
-                                format='MEM',
-                                out_proj=image_src.projection,
-                                multithread=True,
-                                outputBounds=[left, bottom, right, top],
-                                cell_size=image_src.cellY,
-                                d_type='float32',
-                                return_datasource=True,
-                                warpMemoryLimit=256)
+        # Reproject the feature
+        # with rio.open(image_name, mode='r') as src:
+        #
+        #     # Get the transform and new shape of reprojecting the source image.
+        #     transform, width, height = rio.warp.calculate_default_transform(src.crs,
+        #                                                                     image_src.crs,  # destination crs
+        #                                                                     src.width,
+        #                                                                     src.height,
+        #                                                                     left=src.bounds.left,
+        #                                                                     bottom=src.bounds.bottom,
+        #                                                                     right=src.bounds.right,
+        #                                                                     top=src.bounds.top,
+        #                                                                     resolution=image_src.res)
+        #
+        #     # Setup the output array
+        #     if open_bands == -1:
+        #
+        #         bobj = rio.band(src, list(range(1, src.count+1)))
+        #         dst_array = np.empty((src.count, height, width), dtype='float32')
+        #
+        #     else:
+        #
+        #         bobj = rio.band(src, open_bands)
+        #
+        #         if isinstance(open_bands, int):
+        #             dst_array = np.empty((1, height, width), dtype='float32')
+        #         else:
+        #             dst_array = np.empty((len(open_bands), height, width), dtype='float32')
+        #
+        #     rio.warp.reproject(source=bobj,
+        #                        destination=dst_array,
+        #                        src_transform=src.transform,
+        #                        src_crs=src.crs,
+        #                        dst_transform=image_src.transform,
+        #                        dst_crs=image_src.crs,
+        #                        num_threads=1,
+        #                        warp_mem_limit=256)
 
-        image_array = src.read(bands=open_bands)
+        out_ds = warp(image_name,
+                      '',
+                      format='MEM',
+                      out_proj=image_src.crs,
+                      multithread=True,
+                      outputBounds=[left, bottom, right, top],
+                      cell_size=image_src.res[0],
+                      d_type='float32',
+                      return_datasource=True,
+                      warpMemoryLimit=256)
 
-        src.close_file()
-        src = None
+        if out_ds:
+
+            if isinstance(open_bands, int):
+
+                if open_bands == -1:
+                    open_bands_range = list(range(1, out_ds.RasterCount+1))
+                else:
+                    open_bands_range = list(range(open_bands, open_bands+1))
+
+            else:
+                open_bands_range = open_bands
+
+            image_array = np.array([out_ds.GetRasterBand(band_idx).ReadAsArray()
+                                    for band_idx in open_bands_range], dtype='float32')
+
+            out_ds = None
 
     else:
 
@@ -198,7 +309,7 @@ def worker(didx, df_row, stats, n_stats, proj4, raster_value, no_data, verbose, 
     data_values = np.concatenate(([didx], np.zeros(n_stats, dtype='float64') + np.nan))
 
     if isinstance(values, str):
-        values_src = raster_tools.ropen(values)
+        values_src = rio.open(values, mode='r')
     else:
         values_src = values
 
@@ -278,9 +389,9 @@ def worker(didx, df_row, stats, n_stats, proj4, raster_value, no_data, verbose, 
 
         else:
 
-            data_values = np.concatenate(([didx], np.zeros(n_stats * values_src.bands, dtype='float64')))
+            data_values = np.concatenate(([didx], np.zeros(n_stats * values_src.count, dtype='float64')))
 
-            for bdidx in range(0, values_src.bands):
+            for bdidx in range(0, values_src.count):
 
                 for sidx, stat in enumerate(stats):
 
@@ -294,9 +405,7 @@ def worker(didx, df_row, stats, n_stats, proj4, raster_value, no_data, verbose, 
                     data_values[1+(bdidx*n_stats)+sidx] = data_values_stat
 
     if isinstance(values, str):
-
         values_src.close()
-        values_src = None
 
     return data_values
 

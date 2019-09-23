@@ -1,4 +1,5 @@
 import os
+from collections import namedtuple
 
 from .errors import logger, ValuesFileError, StatsError, ZonesFileError
 from .stats import STAT_DICT
@@ -9,6 +10,7 @@ from mpglue import raster_tools
 from osgeo import osr
 import pandas as pd
 import xarray as xr
+import rasterio as rio
 import geopandas as gpd
 import six
 
@@ -85,14 +87,14 @@ class ZonesMixin(object):
                 else:
                     array_shape = data_file.shape
 
-                image_info = raster_tools.ImageInfo()
+                ImageInfo = namedtuple('ImageInfo', 'data bands crs res left right bottom top')
 
                 if len(array_shape) > 2:
 
-                    image_info.update_info(data=data_file,
+                    image_info = ImageInfo(data=data_file,
                                            bands=array_shape[0],
-                                           projection=data_file.projection,
-                                           cellY=data_file.res[0],
+                                           crs=data_file.crs,
+                                           res=data_file.res[0],
                                            left=data_file.x.values[0],
                                            right=data_file.x.values[-1],
                                            bottom=data_file.y.values[-1],
@@ -100,10 +102,10 @@ class ZonesMixin(object):
 
                 else:
 
-                    image_info.update_info(data=data_file,
+                    image_info = ImageInfo(data=data_file,
                                            bands=1,
-                                           projection=data_file.projection,
-                                           cellY=data_file.res[0],
+                                           crs=data_file.crs,
+                                           res=data_file.res[0],
                                            left=data_file.x.values[0],
                                            right=data_file.x.values[-1],
                                            bottom=data_file.y.values[-1],
@@ -120,7 +122,7 @@ class ZonesMixin(object):
                 elif file_extension == '.csv':
                     return pd.read_csv(data_file), None
                 else:
-                    return None, raster_tools.ropen(data_file)
+                    return None, rio.open(data_file, mode='r')
 
     def prepare_files(self, zones, values):
 
