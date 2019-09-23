@@ -143,7 +143,7 @@ class ZonesMixin(object):
     def prepare_zones(self, unique_column):
 
         if self.values_src:
-            self.n_bands = self.values_src.bands
+            self.n_bands = self.values_src.count
         else:
             self.n_bands = 0
 

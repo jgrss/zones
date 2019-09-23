@@ -13,6 +13,7 @@ import xarray as xr
 import shapely
 from shapely.geometry import Polygon
 import bottleneck as bn
+import rasterio as rio
 
 from joblib import Parallel, delayed
 from tqdm import tqdm
@@ -103,7 +104,7 @@ def rasterize(geom, proj4, image_src, image_name, open_bands):
 
     # Transform the geometry
     target_sr = osr.SpatialReference()
-    target_sr.ImportFromWkt(image_src.crs)
+    target_sr.ImportFromWkt(image_src.crs.to_wkt())
     transform = osr.CoordinateTransformation(sp_ref, target_sr)
     gdal_geom = ogr.CreateGeometryFromWkt(geom.to_wkt())
     gdal_geom.Transform(transform)
@@ -188,12 +189,10 @@ def rasterize(geom, proj4, image_src, image_name, open_bands):
         out_ds = warp(image_name,
                       '',
                       format='MEM',
-                      out_proj=image_src.crs,
+                      out_proj=image_src.crs.to_wkt(),
+                      cell_size=image_src.res[0],
                       multithread=True,
                       outputBounds=[left, bottom, right, top],
-                      cell_size=image_src.res[0],
-                      d_type='float32',
-                      return_datasource=True,
                       warpMemoryLimit=256)
 
         if out_ds:
@@ -435,10 +434,8 @@ def calc_parallel(stats, proj4, raster_value, no_data, verbose, n, zones_df, val
 
         if isinstance(values, str):
 
-            with raster_tools.ropen(values) as src_tmp:
-                n_bands = src_tmp.bands
-
-            src_tmp = None
+            with rio.open(values) as src_tmp:
+                n_bands = src_tmp.count
 
         else:
             n_bands = values.bands
@@ -603,4 +600,4 @@ class RasterStats(ZonesMixin):
                                                stats,
                                                self.band,
                                                self.no_data,
-                                               self.values_src.bands)
+                                               self.values_src.count)
