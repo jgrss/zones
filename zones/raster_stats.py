@@ -5,13 +5,11 @@ from .errors import logger
 from .stats import STAT_DICT
 from .helpers import merge_dictionary_keys
 
-from mpglue import raster_tools
-
 import numpy as np
 from osgeo import gdal, ogr, osr
 import xarray as xr
 import shapely
-from shapely.geometry import Polygon
+# from shapely.geometry import Polygon
 import bottleneck as bn
 import rasterio as rio
 
