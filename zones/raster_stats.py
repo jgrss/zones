@@ -297,7 +297,6 @@ def update_dict(didx, zones_dict, image_array, stats, band, no_data, image_bands
                             zones_dict[bidx][didx][sidx] = float(stat_func(image_array[bidx - 1][np.where(~np.isnan(image_array))]).mode)
                         else:
                             zones_dict[bidx][didx][sidx] = stat_func(image_array[bidx - 1])
-
     return zones_dict
 
 

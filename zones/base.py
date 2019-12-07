@@ -5,14 +5,19 @@ from .errors import logger, ValuesFileError, StatsError, ZonesFileError
 from .stats import STAT_DICT
 from .helpers import create_dictionary
 
-from mpglue import raster_tools
-
+import numpy as np
+from scipy.spatial import Voronoi
 from osgeo import osr
 import pandas as pd
 import xarray as xr
 import rasterio as rio
 import geopandas as gpd
 import six
+import shapely
+from shapely.geometry import Point
+from earthpy import clip as cl
+
+shapely.speedups.enable()
 
 
 class ZonesMixin(object):
@@ -77,7 +82,7 @@ class ZonesMixin(object):
         """
 
         if isinstance(data_file, gpd.GeoDataFrame):
-            return data_file, None
+            return data_file.reset_index(), None
         else:
 
             if isinstance(data_file, xr.Dataset) or isinstance(data_file, xr.DataArray):
@@ -118,7 +123,7 @@ class ZonesMixin(object):
                 file_extension = os.path.splitext(os.path.split(data_file)[1])[1].lower().strip()
 
                 if file_extension in ['.shp', '.gpkg']:
-                    return gpd.read_file(data_file), None
+                    return gpd.read_file(data_file).reset_index(), None
                 elif file_extension == '.csv':
                     return pd.read_csv(data_file), None
                 else:
@@ -299,3 +304,36 @@ class ZonesMixin(object):
                 out_df[key] = value[:min_length]
 
         return pd.DataFrame(data=out_df)
+
+
+def voronoi(dataframe, size=100):
+
+    """
+    Creates Voronoi polygons from random points
+
+    Args:
+        dataframe (GeoDataFrame): The dataframe.
+        size (Optional[int]): The number of random points to generate. This number is not guaranteed because
+            points are clipped to geometry.
+
+    Returns:
+        ``DataFrame``
+    """
+
+    geom = dataframe.geometry.values[0]
+
+    left, bottom, right, top = dataframe.bounds.values.flatten().tolist()
+
+    randx = np.random.choice(np.linspace(left, right, (right - left) / 30.0), size=size, replace=False)
+    randy = np.random.choice(np.linspace(top, bottom, (top - bottom) / 30.0), size=size, replace=False)
+
+    points = [[x, y] for x, y in zip(randx, randy) if Point(x, y).within(geom)]
+
+    vor = Voronoi(points)
+    lines = [shapely.geometry.LineString(vor.vertices[line]) for line in vor.ridge_vertices if -1 not in line]
+    geom = [poly for poly in shapely.ops.polygonize(lines)]
+    df_voronoi = gpd.GeoDataFrame(data=range(0, len(geom)), geometry=geom, crs=dataframe.crs)
+
+    df_voronoi_clip = cl.clip_shp(df_voronoi, dataframe).reset_index()
+
+    return df_voronoi_clip

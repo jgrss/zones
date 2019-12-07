@@ -6,7 +6,7 @@ from Cython.Build import cythonize
 import numpy as np
 
 
-__version__ = '0.2.0dev'
+__version__ = '0.2.2'
 
 lib_name = 'zones'
 maintainer = 'Jordan Graesser'
@@ -27,7 +27,9 @@ required_packages = ['GDAL',
                      'xarray',
                      'pandas',
                      'bottleneck',
-                     'six']
+                     'six',
+                     'shapely',
+                     'earthpy']
 
 
 def get_package_data():
