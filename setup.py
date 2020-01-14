@@ -6,7 +6,7 @@ from Cython.Build import cythonize
 import numpy as np
 
 
-__version__ = '0.2.2'
+__version__ = '0.2.3'
 
 lib_name = 'zones'
 maintainer = 'Jordan Graesser'
@@ -20,16 +20,8 @@ with open('README.md') as f:
 with open('LICENSE.txt') as f:
     license_file = f.read()
 
-required_packages = ['GDAL',
-                     'numpy',
-                     'tqdm',
-                     'geopandas',
-                     'xarray',
-                     'pandas',
-                     'bottleneck',
-                     'six',
-                     'shapely',
-                     'earthpy']
+with open('requirements.txt') as f:
+    required_packages = f.read()
 
 
 def get_package_data():
