@@ -1,0 +1,9 @@
+numpy
+tqdm
+geopandas
+xarray
+pandas
+bottleneck
+six
+shapely
+
