@@ -356,7 +356,14 @@ def worker(didx, df_row, stats, n_stats, proj4, raster_value, no_data, verbose, 
             null_idx = np.where(poly_array == 0)
 
             if null_idx[0].shape[0] > 0:
-                image_array[null_idx] = no_data
+
+                if len(image_array.shape) > 2:
+
+                    for ix in range(0, image_array.shape[0]):
+                        image_array[ix][null_idx] = no_data
+
+                else:
+                    image_array[null_idx] = no_data
 
             if any(['nan' in x for x in stats]):
 

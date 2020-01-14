@@ -15,7 +15,12 @@ import geopandas as gpd
 import six
 import shapely
 from shapely.geometry import Point
-from earthpy import clip as cl
+
+try:
+    from earthpy import clip as cl
+    EARTHPY_INSTALLED = True
+except:
+    EARTHPY_INSTALLED = False
 
 shapely.speedups.enable()
 
@@ -319,6 +324,9 @@ def voronoi(dataframe, size=100):
     Returns:
         ``DataFrame``
     """
+
+    if not EARTHPY_INSTALLED:
+        logger.exception('  earthpy must be installed to create voronoi polygons')
 
     geom = dataframe.geometry.values[0]
 
