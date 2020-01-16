@@ -18,3 +18,7 @@ Thumbs.db
 build/
 dist/
 .ipynb_checkpoints
+
+# zones
+doc/
+
