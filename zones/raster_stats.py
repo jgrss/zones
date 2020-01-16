@@ -222,7 +222,7 @@ def rasterize(geom, proj4, image_src, image_name, open_bands):
             image_array = image_src.data.sel(y=slice(top, bottom),
                                              x=slice(left, bottom)).values
 
-    return poly_array, image_array, left, top, right, bottom
+    return poly_array, np.squeeze(image_array), left, top, right, bottom
 
 
 def update_dict(didx, zones_dict, image_array, stats, band, no_data, image_bands):
