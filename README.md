@@ -33,7 +33,7 @@ Clone and build
 ```commandline
 > git clone https://github.com/jgrss/zones.git
 > cd zones/
-> pip3 install --user .
+> python setup.py build && python setup.py install 
 >
 > # Cleanup
 > cd ../
@@ -43,13 +43,13 @@ Clone and build
 or install directly from GitHub
 
 ```commandline
-> pip3 install --user git+https://github.com/jgrss/zones
+> pip install git+https://github.com/jgrss/zones
 ```
 
 #### Test the installation
 
 ```commandline
-> python3 -c "import zones;zones.test_raster()"
+> python -c "import zones;zones.test_raster()"
 ```
 
 ### Zonal stats with polygon and raster data
