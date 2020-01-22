@@ -4,6 +4,7 @@ from collections import namedtuple
 from .errors import logger, ValuesFileError, StatsError, ZonesFileError
 from .stats import STAT_DICT
 from .helpers import create_dictionary
+from . import util
 
 import numpy as np
 from scipy.spatial import Voronoi
@@ -213,6 +214,7 @@ class ZonesMixin(object):
         if not proj4:
 
             sr = osr.SpatialReference()
+            util.check_axis_order(sr)
             sr.ImportFromWkt(self.values_src.projection)
             proj4 = sr.ExportToProj4()
 

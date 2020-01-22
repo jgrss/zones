@@ -4,6 +4,7 @@ from .base import ZonesMixin
 from .errors import logger
 from .stats import STAT_DICT
 from .helpers import merge_dictionary_keys
+from . import util
 
 import numpy as np
 from osgeo import gdal, ogr, osr
@@ -99,10 +100,12 @@ def rasterize(geom, proj4, image_src, image_name, open_bands):
     datasource = ogr.GetDriverByName('Memory').CreateDataSource('wrk')
     sp_ref = osr.SpatialReference()
     sp_ref.ImportFromProj4(proj4)
+    util.check_axis_order(sp_ref)
 
     # Transform the geometry
     target_sr = osr.SpatialReference()
     target_sr.ImportFromWkt(image_src.crs.to_wkt())
+    util.check_axis_order(target_sr)
     transform = osr.CoordinateTransformation(sp_ref, target_sr)
     gdal_geom = ogr.CreateGeometryFromWkt(geom.to_wkt())
     gdal_geom.Transform(transform)
