@@ -13,5 +13,5 @@ def check_axis_order(spatial_reference):
         None
     """
 
-    if hasattr(sr, 'SetAxisMappingStrategy'):
+    if hasattr(spatial_reference, 'SetAxisMappingStrategy'):
         spatial_reference.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
