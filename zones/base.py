@@ -1,5 +1,6 @@
 import os
 from collections import namedtuple
+import math
 
 from .errors import logger, ValuesFileError, StatsError, ZonesFileError
 from .stats import STAT_DICT
@@ -15,7 +16,7 @@ import rasterio as rio
 import geopandas as gpd
 import six
 import shapely
-from shapely.geometry import Point
+from shapely.geometry import Point, Polygon
 
 try:
     from earthpy import clip as cl
@@ -311,6 +312,57 @@ class ZonesMixin(object):
                 out_df[key] = value[:min_length]
 
         return pd.DataFrame(data=out_df)
+
+
+def grid(bounds, gy, gx, celly, cellx, crs=None):
+
+    """
+    Creates polygon grids
+
+    Args:
+        bounds (tuple | BoundingBox): A tuple of (left, bottom, right, top) or a
+            ``rasterio.coords.BoundingBox`` instance.
+        gy (float): The target grid y size.
+        gx (float): The target grid x size.
+        celly (float): The y cell size.
+        cellx (float): The x cell size.
+        crs (Optional[str]): The CRS.
+
+    Returns:
+        ``geopandas.GeoDataFrame``
+
+    Example:
+        >>> import zones
+        >>>
+        >>> bounds = (left, bottom, right, top)
+        >>>
+        >>> # Create 1 ha grids
+        >>> df = zones.grid(bounds, 100, 100, 30.0, 30.0)
+    """
+
+    left, bottom, right, top = bounds
+
+    polys = list()
+
+    nrows = int(abs(top - bottom) / abs(celly))
+    ncols = int(abs(right - left) / abs(cellx))
+
+    nrowsp = int(math.ceil((nrows * abs(celly)) / gy))
+    ncolsp = int(math.ceil((ncols * abs(cellx)) / gx))
+
+    for i in range(0, nrowsp):
+        for j in range(0, ncolsp):
+
+            polys.append(Polygon([(left + j * gx, top - i * gy),
+                                  (left + (j * gx) + gx, top - i * gy),
+                                  (left + (j * gx) + gx, top - (i * gy) - gy),
+                                  (left + j * gx, top - (i * gy) - gy),
+                                  (left + j * gx, top - i * gy)]))
+
+    return gpd.GeoDataFrame(data=range(0, len(polys)),
+                            columns=['grid'],
+                            geometry=polys,
+                            crs=crs)
 
 
 def voronoi(dataframe, size=100):
