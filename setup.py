@@ -6,7 +6,7 @@ from Cython.Build import cythonize
 import numpy as np
 
 
-__version__ = '0.2.5'
+__version__ = '0.2.6'
 
 lib_name = 'zones'
 maintainer = 'Jordan Graesser'
