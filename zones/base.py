@@ -13,6 +13,7 @@ from osgeo import osr
 import pandas as pd
 import xarray as xr
 import rasterio as rio
+from rasterio.crs import CRS
 import geopandas as gpd
 import six
 import shapely
@@ -209,8 +210,12 @@ class ZonesMixin(object):
 
         proj4 = ''
 
-        for k, v in six.iteritems(self.zones_df.crs):
-            proj4 += '+{}={} '.format(k, v)
+        try:
+            proj4 = CRS.from_string(self.zones_df.crs).to_proj4()
+        except:
+
+            for k, v in six.iteritems(self.zones_df.crs):
+                proj4 += '+{}={} '.format(k, v)
 
         if not proj4:
 

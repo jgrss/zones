@@ -332,8 +332,6 @@ def worker(didx, df_row, stats, n_stats, proj4, raster_value, no_data, verbose, 
         image_array = np.where(image_array == raster_value, 1, 0)
 
         if image_array.max() == 0:
-
-            data_values = 0.0
             return_early = True
 
     elif isinstance(raster_value, list):
@@ -346,8 +344,6 @@ def worker(didx, df_row, stats, n_stats, proj4, raster_value, no_data, verbose, 
         image_array = image_array_
 
         if image_array.max() == 0:
-
-            data_values = 0.0
             return_early = True
 
     if not return_early:
@@ -446,7 +442,7 @@ def calc_parallel(stats, proj4, raster_value, no_data, verbose, n, zones_df, val
 
         else:
             n_bands = values.bands
-
+    
     return merge_dictionary_keys(np.array(results, dtype='float64'), stats, n_bands)
 
 
