@@ -325,10 +325,20 @@ def worker(didx, df_row, stats, n_stats, proj4, raster_value, no_data, verbose, 
     geom = df_row.geometry
 
     if not geom:
+
+        if isinstance(values, str):
+            values_src.close()
+
         return data_values
 
     # Rasterize the data
     poly_array, image_array, left, top, right, bottom = rasterize(geom, proj4, values_src, values, open_bands)
+
+    # Cases where multi-band images are flattened
+    #   because of single-zone pixels
+    if values_src.count > 1:
+        if len(image_array.shape) == 1:
+            image_array = image_array.reshape(values_src.count, 1, 1)
 
     if isinstance(raster_value, int):
 
@@ -352,7 +362,12 @@ def worker(didx, df_row, stats, n_stats, proj4, raster_value, no_data, verbose, 
     if not return_early:
 
         if not isinstance(poly_array, np.ndarray):
+
+            if isinstance(values, str):
+                values_src.close()
+
             return data_values
+
         else:
 
             null_idx = np.where(poly_array == 0)
@@ -361,7 +376,7 @@ def worker(didx, df_row, stats, n_stats, proj4, raster_value, no_data, verbose, 
 
                 if values_src.count > 1:
 
-                    for ix in range(0, image_array.shape[0]):
+                    for ix in range(0, values_src.count):
                         image_array[ix][null_idx] = no_data
 
                 else:
@@ -375,6 +390,10 @@ def worker(didx, df_row, stats, n_stats, proj4, raster_value, no_data, verbose, 
                     image_array[no_data_idx] = np.nan
 
                 if np.isnan(bn.nanmax(image_array)):
+
+                    if isinstance(values, str):
+                        values_src.close()
+
                     return data_values
 
         if values_src.count == 1:
