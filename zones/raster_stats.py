@@ -305,17 +305,20 @@ def update_dict(didx, zones_dict, image_array, stats, band, no_data, image_bands
 
 def worker(didx, df_row, stats, n_stats, proj4, raster_value, no_data, verbose, n, band, open_bands, values):
 
-    data_values = np.concatenate(([didx], np.zeros(n_stats, dtype='float64') + np.nan))
+    if verbose > 1:
+
+        if didx % 100 == 0:
+            logger.info('    Zone {:,d} of {:,d} ...'.format(didx+1, n))
 
     if isinstance(values, str):
         values_src = rio.open(values, mode='r')
     else:
         values_src = values
 
-    if verbose > 1:
-
-        if didx % 100 == 0:
-            logger.info('    Zone {:,d} of {:,d} ...'.format(didx+1, n))
+    if values_src.count == 1:
+        data_values = np.concatenate(([didx], np.zeros(n_stats, dtype='float64') + np.nan))
+    else:
+        data_values = np.concatenate(([didx], np.zeros(n_stats * values_src.count, dtype='float64')))
 
     return_early = False
 
@@ -356,7 +359,7 @@ def worker(didx, df_row, stats, n_stats, proj4, raster_value, no_data, verbose, 
 
             if null_idx[0].shape[0] > 0:
 
-                if len(image_array.shape) > 2:
+                if values_src.count > 1:
 
                     for ix in range(0, image_array.shape[0]):
                         image_array[ix][null_idx] = no_data
@@ -374,9 +377,7 @@ def worker(didx, df_row, stats, n_stats, proj4, raster_value, no_data, verbose, 
                 if np.isnan(bn.nanmax(image_array)):
                     return data_values
 
-        if len(image_array.shape) == 2:
-
-            data_values = np.concatenate(([didx], np.zeros(n_stats, dtype='float64')))
+        if values_src.count == 1:
 
             for sidx, stat in enumerate(stats):
 
@@ -390,8 +391,6 @@ def worker(didx, df_row, stats, n_stats, proj4, raster_value, no_data, verbose, 
                 data_values[1+sidx] = data_values_stat
 
         else:
-
-            data_values = np.concatenate(([didx], np.zeros(n_stats * values_src.count, dtype='float64')))
 
             for bdidx in range(0, values_src.count):
 
@@ -442,7 +441,7 @@ def calc_parallel(stats, proj4, raster_value, no_data, verbose, n, zones_df, val
 
         else:
             n_bands = values.bands
-    
+
     return merge_dictionary_keys(np.array(results, dtype='float64'), stats, n_bands)
 
 
