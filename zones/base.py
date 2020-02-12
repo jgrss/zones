@@ -370,14 +370,15 @@ def grid(bounds, gy, gx, celly, cellx, crs=None):
                             crs=crs)
 
 
-def voronoi(dataframe, size=100):
+def voronoi(dataframe, grid_size=100, sample_size=10):
 
     """
     Creates Voronoi polygons from random points
 
     Args:
         dataframe (GeoDataFrame): The dataframe.
-        size (Optional[int]): The number of random points to generate. This number is not guaranteed because
+        grid_size (Optional[int]): The number of x and y coordinates to sample from.
+        sample_size (Optional[int]): The number of random points to generate. This number is not guaranteed because
             points are clipped to geometry.
 
     Returns:
@@ -391,8 +392,8 @@ def voronoi(dataframe, size=100):
 
     left, bottom, right, top = dataframe.bounds.values.flatten().tolist()
 
-    randx = np.random.choice(np.arange(left, right, (right - left) / 30.0), size=int(size), replace=False)
-    randy = np.random.choice(np.arange(top, bottom, (top - bottom) / 30.0), size=int(size), replace=False)
+    randx = np.random.choice(np.linspace(left, right, grid_size), size=int(sample_size), replace=False)
+    randy = np.random.choice(np.linspace(top, bottom, grid_size), size=int(sample_size), replace=False)
 
     points = [[x, y] for x, y in zip(randx, randy) if Point(x, y).within(geom)]
 
