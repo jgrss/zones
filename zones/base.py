@@ -391,8 +391,8 @@ def voronoi(dataframe, size=100):
 
     left, bottom, right, top = dataframe.bounds.values.flatten().tolist()
 
-    randx = np.random.choice(np.linspace(left, right, (right - left) / 30.0), size=size, replace=False)
-    randy = np.random.choice(np.linspace(top, bottom, (top - bottom) / 30.0), size=size, replace=False)
+    randx = np.random.choice(np.arange(left, right, (right - left) / 30.0), size=int(size), replace=False)
+    randy = np.random.choice(np.arange(top, bottom, (top - bottom) / 30.0), size=int(size), replace=False)
 
     points = [[x, y] for x, y in zip(randx, randy) if Point(x, y).within(geom)]
 
