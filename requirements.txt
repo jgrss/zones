@@ -4,22 +4,46 @@
 #
 #    pip-compile requirements.in
 #
-attrs>=19.3.0             # via fiona
-bottleneck>=1.*
-click-plugins>=1.1.1      # via fiona
-click>=7.0                # via click-plugins, cligj, fiona
-cligj>=0.5.0              # via fiona
+affine>=2.3.0             # via rasterio
+attrs>=19.3.0             # via fiona, rasterio
+bottleneck>=1.3.1
+certifi>=2019.11.28       # via requests
+chardet>=3.0.4            # via requests
+click-plugins>=1.1.1      # via fiona, rasterio
+click>=7.0                # via click-plugins, cligj, fiona, rasterio
+cligj>=0.5.0              # via fiona, rasterio
+cycler>=0.10.0            # via matplotlib
+cython>=0.29.15
+decorator>=4.4.1          # via networkx
+earthpy>=0.8.0
 fiona>=1.8.13             # via geopandas
-geopandas>=0.6.*
+geopandas>=0.6.3
+idna>=2.8                 # via requests
+imageio>=2.6.1            # via scikit-image
+joblib>=0.14.1
+kiwisolver>=1.1.0         # via matplotlib
+matplotlib>=3.1.3         # via earthpy, scikit-image
 munch>=2.5.0              # via fiona
-numpy>=1.18.*
-pandas>=0.25.*
+networkx>=2.4             # via scikit-image
+numpy>=1.18.1
+pandas>=1.0.1
+pillow>=7.0.0             # via imageio, scikit-image
+pyparsing>=2.4.6          # via matplotlib, snuggs
 pyproj>=2.4.2.post1       # via geopandas
-python-dateutil>=2.8.1    # via pandas
+python-dateutil>=2.8.1    # via matplotlib, pandas
 pytz>=2019.3              # via pandas
-shapely>=1.6.4.post2
-six>=1.13.0
-tqdm>=4.41.1
-xarray>=0.14.*
-GDAL
+pywavelets>=1.1.1         # via scikit-image
+rasterio>=1.1.2
+requests>=2.22.0          # via earthpy
+rtree>=0.9.4              # via earthpy
+scikit-image>=0.16.2      # via earthpy
+scipy>=1.4.1              # via scikit-image
+shapely>=1.7.0
+six>=1.14.0
+snuggs>=1.4.7             # via rasterio
+tqdm>=4.42.1
+urllib3>=1.25.8           # via requests
+xarray>=0.15.0
 
+# The following packages are considered to be unsafe in a requirements file:
+# setuptools
