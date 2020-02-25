@@ -42,10 +42,7 @@ requests>=2.22.0          # via earthpy
 rtree>=0.9.4              # via earthpy
 scikit-image>=0.16.2      # via earthpy
 scipy>=1.4.1              # via scikit-image
-shapely>=1.7.0
-six>=1.14.0
 snuggs>=1.4.7             # via rasterio
-tqdm>=4.42.1
 urllib3>=1.25.8           # via requests
 
 # The following packages are considered to be unsafe in a requirements file:
