@@ -1,4 +1,4 @@
-from ..errors import logger
+from .errors import logger
 
 from osgeo import osr
 import pyproj
