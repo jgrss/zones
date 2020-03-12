@@ -15,7 +15,7 @@ def check_crs(crs):
         ``rasterio.crs.CRS``
     """
 
-    if isinstance(crs, pyproj.crs.crs.CRS):
+    if isinstance(crs, pyproj.crs.crs.CRS) or isinstance(crs, pyproj.crs.CRS):
         dst_crs = CRS.from_proj4(crs.to_proj4())
     elif isinstance(crs, CRS):
         dst_crs = crs
