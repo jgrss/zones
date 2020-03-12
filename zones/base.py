@@ -173,17 +173,19 @@ class ZonesMixin(object):
 
         if hasattr(self, 'band'):
 
+            prefix = self.column_prefix if self.column_prefix else '_bd'
+
             if isinstance(self.band, int):
 
                 values_df = pd.DataFrame.from_dict(self.zone_values[1], orient='index')
-                values_df.columns = ('_bd{:d},'.format(self.band).join(self.stats) + '_bd{:d}'.format(self.band)).split(',')
+                values_df.columns = ('{}{:d},'.format(prefix, self.band).join(self.stats) + '{}{:d}'.format(prefix, self.band)).split(',')
 
             else:
 
                 for bidx in range(1, self.n_bands+1):
 
                     values_df_ = pd.DataFrame.from_dict(self.zone_values[bidx], orient='index')
-                    values_df_.columns = ('_bd{:d},'.format(bidx).join(self.stats) + '_bd{:d}'.format(bidx)).split(',')
+                    values_df_.columns = ('{}{:d},'.format(prefix, bidx).join(self.stats) + '{}{:d}'.format(prefix, bidx)).split(',')
 
                     if bidx == 1:
                         values_df = values_df_.copy()

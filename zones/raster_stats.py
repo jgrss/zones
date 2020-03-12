@@ -479,6 +479,7 @@ class RasterStats(ZonesMixin):
             Default is None, which treats all zones as unique and uses the
             highest (resolution) level geometry.
         band (Optional[int]): The band to calculate (if multi-band). Default is None, or calculate all bands.
+        column_prefix (Optional[str]): A name to prepend to each band (column) name.
         verbose (Optional[int]): The verbosity level. Default is 0.
         n_jobs (Optional[int]): The number of parallel processes (zones). Default is 1.
             *Currently, this only works with one statistic.
@@ -506,6 +507,7 @@ class RasterStats(ZonesMixin):
                  raster_value=None,
                  unique_column=None,
                  band=None,
+                 column_prefix=None,
                  verbose=0,
                  n_jobs=1):
 
@@ -517,6 +519,7 @@ class RasterStats(ZonesMixin):
         self.band = band
         self.verbose = verbose
         self.n_jobs = n_jobs
+        self.column_prefix = column_prefix
 
         self.stats = None
         self.zone_values = None
