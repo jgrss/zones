@@ -210,15 +210,6 @@ class ZonesMixin(object):
 
         proj4 = util.check_crs(self.zones_df.crs)
 
-        # proj4 = ''
-        #
-        # try:
-        #     proj4 = CRS.from_string(self.zones_df.crs).to_proj4()
-        # except:
-        #
-        #     for k, v in six.iteritems(self.zones_df.crs):
-        #         proj4 += '+{}={} '.format(k, v)
-
         if not proj4:
 
             sr = osr.SpatialReference()

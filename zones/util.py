@@ -1,3 +1,5 @@
+from ..errors import logger
+
 from osgeo import osr
 import pyproj
 from rasterio.crs import CRS
@@ -12,7 +14,7 @@ def check_crs(crs):
         crs (``CRS`` | int | dict | str): The CRS instance.
 
     Returns:
-        ``rasterio.crs.CRS``
+        ``str`` as proj4
     """
 
     if isinstance(crs, pyproj.crs.crs.CRS) or isinstance(crs, pyproj.crs.CRS):
