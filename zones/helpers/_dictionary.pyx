@@ -15,7 +15,6 @@ import numpy as np
 cimport numpy as np
 
 from libcpp.map cimport map as cpp_map
-from libcpp.vector cimport vector
 
 
 DTYPE_float64 = np.float64
@@ -23,6 +22,15 @@ ctypedef np.float64_t DTYPE_float64_t
 
 DTYPE_int64 = np.int64
 ctypedef np.int64_t DTYPE_int64_t
+
+
+cdef extern from "<vector>" namespace "std":
+    cdef cppclass vector[T]:
+        void push_back(T&) nogil
+        void pop_back() nogil
+        size_t size() nogil
+        T& operator[](size_t) nogil
+        void clear() nogil
 
 
 cdef extern from 'numpy/npy_math.h' nogil:

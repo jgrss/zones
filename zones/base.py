@@ -1,6 +1,8 @@
 import os
 from collections import namedtuple
 import math
+import itertools
+from pathlib import Path
 
 from .errors import logger, ValuesFileError, StatsError, ZonesFileError
 from .stats import STAT_DICT
@@ -54,7 +56,7 @@ class ZonesMixin(object):
         if self.verbose > 0:
             logger.info('  Preparing files ...')
 
-        self.prepare_files(self.zones, self.values)
+        self.prepare_files()
 
         if self.verbose > 0:
             logger.info('  Preparing zones ...')
@@ -137,21 +139,31 @@ class ZonesMixin(object):
                 else:
                     return None, rio.open(data_file, mode='r')
 
-    def prepare_files(self, zones, values):
+    def prepare_files(self):
 
         """
         Prepares files
-
-        Args:
-            zones
-            values
         """
 
         self.values_df = None
         self.values_src = None
+        self.other_values_df = []
+        self.other_values_src = []
 
-        self.zones_df = self.check_if_geodf(zones)[0]
-        self.values_df, self.values_src = self.check_if_geodf(values)
+        self.zones_df = self.check_if_geodf(self.zones)[0]
+        self.values_df, self.values_src = self.check_if_geodf(self.values)
+
+        if self.other_values:
+
+            if not isinstance(self.other_values, list):
+                logger.exception('  The other raster values must be a list.')
+                raise TypeError
+
+            for other_values in self.other_values:
+
+                other_values_df_, other_values_src_ = self.check_if_geodf(other_values)
+                self.other_values_df.append(other_values_df_)
+                self.other_values_src.append(other_values_src_)
 
     def prepare_zones(self, unique_column):
 
@@ -160,14 +172,93 @@ class ZonesMixin(object):
         else:
             self.n_bands = 0
 
-        # TODO
+        if self.other_values:
+            self.n_other_images = len(self.other_values)
+        else:
+            self.n_other_images = 0
+
         if isinstance(unique_column, str):
             return None
         else:
 
-            return create_dictionary(self.zones_df.shape[0],
-                                     len(self.stats),
-                                     self.n_bands)
+            if self.other_values:
+
+                dict_len = self.zones_df.shape[0]
+
+                zones_dict_ = {}
+
+                if self.n_bands > 1:
+
+                    for bidx in range(1, self.n_bands+1):
+
+                        zones_dict_[bidx] = {}
+
+                        for a, b in itertools.combinations([self.values] + self.other_values, r=2):
+
+                            a, b = Path(a).name, Path(b).name
+
+                            zones_dict_[bidx][f'{a}-{b}'] = {}
+
+                            for i in range(0, dict_len):
+                                zones_dict_[bidx][f'{a}-{b}'][i] = [0.0]
+
+                else:
+
+                    zones_dict_[1] = {}
+
+                    for a, b in itertools.combinations([self.values] + self.other_values, r=2):
+
+                        a, b = Path(a).name, Path(b).name
+
+                        zones_dict_[1][f'{a}-{b}'] = {}
+
+                        for i in range(0, dict_len):
+                            zones_dict_[1][f'{a}-{b}'][i] = [0.0]
+
+                return zones_dict_
+
+            else:
+
+                return create_dictionary(self.zones_df.shape[0],
+                                         len(self.stats),
+                                         self.n_bands)
+
+    def _finalize_frequencies(self):
+
+        zones_list = sorted(list(self.zone_values[1][list(self.zone_values[1].keys())[0]].keys()))
+
+        pairs_list = list(set(list(itertools.chain.from_iterable(
+            [[[f'{pair} band-{bd}' for pair in self.zone_values[bd].keys()] for bd in range(1, self.n_bands+1)] for zone in zones_list][0]))))
+
+        values_list = list(set(list(itertools.chain.from_iterable(
+            [[[list(self.zone_values[bd][pair][zone][0].keys()) for pair in self.zone_values[bd].keys()] for bd in range(1, self.n_bands+1)] for zone in zones_list][0][0]))))
+
+        arrays = [pairs_list * len(values_list), values_list]
+
+        tuples = list(zip(*arrays))
+        index = pd.MultiIndex.from_tuples(tuples, names=['pair', 'zone'])
+        df = pd.DataFrame(np.zeros((len(zones_list), len(values_list)), dtype='int64'), index=zones_list, columns=index)
+
+        for z in zones_list:
+
+            for pair in pairs_list:
+
+                image_pair, band_str = pair.split(' ')
+                band = int(band_str.split('-')[1])
+
+                dft = df.loc[z, pair]
+                dft.loc[:] = 0
+
+                for value in values_list:
+
+                    if value in dft:
+
+                        if (image_pair in self.zone_values[band]) and (z in self.zone_values[band][image_pair]) and (value in self.zone_values[band][image_pair][z][0]):
+                            dft.loc[value] = self.zone_values[band][image_pair][z][0][value]
+
+                df.loc[z, pair] = dft.values
+
+        return df
 
     def finalize_dataframe(self):
 
@@ -182,22 +273,30 @@ class ZonesMixin(object):
 
             else:
 
-                for bidx in range(1, self.n_bands+1):
+                if self.other_values:
+                    values_df = self._finalize_frequencies()
+                else:
 
-                    values_df_ = pd.DataFrame.from_dict(self.zone_values[bidx], orient='index')
-                    values_df_.columns = ('{}{:d},'.format(prefix, bidx).join(self.stats) + '{}{:d}'.format(prefix, bidx)).split(',')
+                    for bidx in range(1, self.n_bands+1):
 
-                    if bidx == 1:
-                        values_df = values_df_.copy()
-                    else:
-                        values_df = pd.concat((values_df, values_df_), axis=1)
+                        values_df_ = pd.DataFrame.from_dict(self.zone_values[bidx], orient='index')
+
+                        values_df_.columns = ('{}{:d},'.format(prefix, bidx).join(self.stats) + '{}{:d}'.format(prefix, bidx)).split(',')
+
+                        if bidx == 1:
+                            values_df = values_df_.copy()
+                        else:
+                            values_df = pd.concat((values_df, values_df_), axis=1)
 
         else:
 
             values_df = pd.DataFrame.from_dict(self.zone_values, orient='index')
             values_df.columns = self.stats
 
-        return pd.merge(self.zones_df, values_df, left_index=True, right_index=True)
+        if self.other_values:
+            return values_df
+        else:
+            return pd.merge(self.zones_df, values_df, left_index=True, right_index=True)
 
     def _close_files(self):
 
@@ -207,6 +306,15 @@ class ZonesMixin(object):
 
                 self.values_src.close()
                 self.values_src = None
+
+        if self.other_values_src:
+
+            for other_src in self.other_values_src:
+
+                if hasattr(other_src, 'close'):
+
+                    other_src.close()
+                    other_src = None
 
     def _prepare_proj4(self):
 
@@ -232,20 +340,58 @@ class ZonesMixin(object):
 
             if not os.path.isfile(self.values):
 
-                logger.error('  The values file does not exist.')
+                logger.exception('  The values file does not exist.')
                 raise ValuesFileError
+
+        if self.other_values:
+
+            if isinstance(self.other_values, list):
+
+                for other_value in self.other_values:
+
+                    if not os.path.isfile(other_value):
+
+                        logger.exception('  The other values {} file does not exist.'.format(other_value))
+                        raise ValuesFileError
 
         if not isinstance(self.zones, gpd.GeoDataFrame):
 
             if not os.path.isfile(self.zones):
 
-                logger.error('  The zones file does not exist.')
+                logger.exception('  The zones file does not exist.')
                 raise ZonesFileError
 
         if list(set(stats).difference(STAT_DICT.keys())):
 
-            logger.error('  The statistic, {}, is not available.'.format(list(set(stats).difference(STAT_DICT.keys()))))
+            logger.exception('  The statistic, {}, is not available.'.format(list(set(stats).difference(STAT_DICT.keys()))))
             raise StatsError
+
+    @staticmethod
+    def melt_freq(df):
+
+        """
+        Melts records of frequencies
+
+        Args:
+            df (DataFrame): The DataFrame to melt.
+
+        Example:
+            >>> import zones
+            >>>
+            >>> # Cross-tabulation of two rasters
+            >>> zs = zones.RasterStats('raster.tif', 'vector.gpkg', other_values='other_raster.tif', n_jobs=1)
+            >>> df = zs.calculate('crosstab')
+            >>>
+            >>> df = zs.melt_freq(df)
+
+        Returns:
+            Melted DataFrame (DataFrame)
+        """
+
+        dfm = pd.melt(df.copy())
+        dfm.columns = ['pair', 'values', 'freq']
+
+        return dfm
 
     @staticmethod
     def melt_dist(df, id_field=None):
@@ -382,6 +528,7 @@ def voronoi(dataframe, grid_size=100, sample_size=10):
 
     if not EARTHPY_INSTALLED:
         logger.exception('  earthpy must be installed to create voronoi polygons')
+        raise ImportError
 
     geom = dataframe.geometry.values[0]
 

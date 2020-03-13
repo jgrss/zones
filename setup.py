@@ -6,8 +6,6 @@ from Cython.Build import cythonize
 import numpy as np
 
 
-__version__ = '0.2.12'
-
 lib_name = 'zones'
 maintainer = 'Jordan Graesser'
 maintainer_email = ''
@@ -22,6 +20,20 @@ with open('LICENSE.txt') as f:
 
 with open('requirements.txt') as f:
     required_packages = f.read()
+
+# Parse the version from the module.
+# Source: https://github.com/mapbox/rasterio/blob/master/setup.py
+with open('zones/version.py') as f:
+
+    for line in f:
+
+        if line.find("__version__") >= 0:
+
+            version = line.split("=")[1].strip()
+            version = version.strip('"')
+            version = version.strip("'")
+
+            continue
 
 
 def get_package_data():
@@ -58,7 +70,7 @@ def setup_package():
                     maintainer_email=maintainer_email,
                     description=description,
                     license=license_file,
-                    version=__version__,
+                    version=version,
                     long_description=long_description,
                     package_data=get_package_data(),
                     packages=get_packages(),

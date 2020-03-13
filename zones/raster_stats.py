@@ -1,4 +1,6 @@
 from __future__ import division
+import itertools
+from pathlib import Path
 
 from .base import ZonesMixin
 from .errors import logger
@@ -88,7 +90,7 @@ def warp(input_image,
     return out_ds
 
 
-def rasterize(geom, proj4, image_src, image_name, open_bands):
+def rasterize_zone(geom, proj4, image_src, image_name, open_bands, return_poly=True):
 
     """
     Rasterizes a polygon geometry
@@ -113,36 +115,38 @@ def rasterize(geom, proj4, image_src, image_name, open_bands):
     # Get the transformation boundary
     left, right, bottom, top = gdal_geom.GetEnvelope()
 
-    # Create the new layer
-    lyr = datasource.CreateLayer('', geom_type=ogr.wkbPolygon, srs=target_sr)
-    field_def = ogr.FieldDefn('Value', ogr.OFTInteger)
-    lyr.CreateField(field_def)
-
-    # Add a feature
-    feature = ogr.Feature(lyr.GetLayerDefn())
-    feature.SetGeometryDirectly(ogr.Geometry(wkt=str(gdal_geom)))
-    feature.SetField('Value', 1)
-    lyr.CreateFeature(feature)
-
     xcount = int(round((right - left) / image_src.res[0]))
     ycount = int(round((top - bottom) / image_src.res[0]))
 
-    # Create a raster to rasterize into.
-    try:
-        target_ds = gdal.GetDriverByName('MEM').Create('', xcount, ycount, 1, gdal.GDT_Byte)
-    except:
-        return None, None, None, None, None, None
+    if return_poly:
 
-    target_ds.SetGeoTransform([left, image_src.res[0], 0., top, 0., -image_src.res[0]])
-    target_ds.SetProjection(target_sr.ExportToWkt())
+        # Create the new layer
+        lyr = datasource.CreateLayer('', geom_type=ogr.wkbPolygon, srs=target_sr)
+        field_def = ogr.FieldDefn('Value', ogr.OFTInteger)
+        lyr.CreateField(field_def)
 
-    # Rasterize
-    gdal.RasterizeLayer(target_ds, [1], lyr, options=['ATTRIBUTE=Value'])
+        # Add a feature
+        feature = ogr.Feature(lyr.GetLayerDefn())
+        feature.SetGeometryDirectly(ogr.Geometry(wkt=str(gdal_geom)))
+        feature.SetField('Value', 1)
+        lyr.CreateFeature(feature)
 
-    poly_array = np.uint8(target_ds.GetRasterBand(1).ReadAsArray())
+        # Create a raster to rasterize into.
+        try:
+            target_ds = gdal.GetDriverByName('MEM').Create('', xcount, ycount, 1, gdal.GDT_Byte)
+        except:
+            return None, None, None, None, None, None
 
-    datasource = None
-    target_ds = None
+        target_ds.SetGeoTransform([left, image_src.res[0], 0., top, 0., -image_src.res[0]])
+        target_ds.SetProjection(target_sr.ExportToWkt())
+
+        # Rasterize
+        gdal.RasterizeLayer(target_ds, [1], lyr, options=['ATTRIBUTE=Value'])
+
+        poly_array = np.uint8(target_ds.GetRasterBand(1).ReadAsArray())
+
+        datasource = None
+        target_ds = None
 
     bottom = top - (ycount * image_src.res[0])
     right = left + (xcount * image_src.res[0])
@@ -225,7 +229,10 @@ def rasterize(geom, proj4, image_src, image_name, open_bands):
             image_array = image_src.data.sel(y=slice(top, bottom),
                                              x=slice(left, bottom)).values
 
-    return poly_array, np.squeeze(image_array), left, top, right, bottom
+    if return_poly:
+        return poly_array, np.squeeze(image_array), left, top, right, bottom
+    else:
+        return np.squeeze(image_array)
 
 
 def update_dict(didx, zones_dict, image_array, stats, band, no_data, image_bands):
@@ -303,6 +310,55 @@ def update_dict(didx, zones_dict, image_array, stats, band, no_data, image_bands
     return zones_dict
 
 
+def update_crosstab_dict(didx,
+                         zones_dict,
+                         image_array,
+                         other_image_array_list,
+                         band,
+                         image_bands,
+                         values_name,
+                         other_values_list):
+
+    """
+    Updates the stats dictionary
+    """
+
+    combined_arrays = [image_array] + other_image_array_list
+    combined_list = [Path(values_name).name] + [Path(fn).name for fn in other_values_list]
+
+    stat_func = STAT_DICT['crosstab']
+
+    if len(image_array.shape) < 3:
+
+        for a, b in itertools.combinations(combined_list, r=2):
+
+            a, b = Path(a).name, Path(b).name
+
+            idx1 = combined_list.index(a)
+            idx2 = combined_list.index(b)
+
+            zones_dict[1][f'{a}-{b}'][didx][0] = stat_func(combined_arrays[idx1], combined_arrays[idx2])
+
+    else:
+
+        if isinstance(band, int):
+            zones_dict[band][didx][0] = stat_func(image_array[band-1], other_image_array[band-1])
+        else:
+
+            for bidx in range(1, image_bands+1):
+
+                for a, b in itertools.combinations(combined_list, r=2):
+
+                    a, b = Path(a).name, Path(b).name
+
+                    idx1 = combined_list.index(a)
+                    idx2 = combined_list.index(b)
+
+                    zones_dict[bidx][f'{a}-{b}'][didx][0] = stat_func(combined_arrays[idx1][bidx-1], combined_arrays[idx2][bidx-1])
+
+    return zones_dict
+
+
 def worker(didx, df_row, stats, n_stats, proj4, raster_value, no_data, verbose, n, band, open_bands, values):
 
     if verbose > 1:
@@ -332,7 +388,7 @@ def worker(didx, df_row, stats, n_stats, proj4, raster_value, no_data, verbose, 
         return data_values
 
     # Rasterize the data
-    poly_array, image_array, left, top, right, bottom = rasterize(geom, proj4, values_src, values, open_bands)
+    poly_array, image_array, left, top, right, bottom = rasterize_zone(geom, proj4, values_src, values, open_bands)
 
     # Cases where multi-band images are flattened
     #   because of single-zone pixels
@@ -468,18 +524,19 @@ class RasterStats(ZonesMixin):
 
     """
     Args:
-        values (str or xarray): The raster values file. Can be float or categorical raster.
+        values (str or xarray): The raster values file. Can be a float or categorical raster.
         zones (str or GeoDataFrame): The zones file.
             Accepted types are:
                 str: vector file (e.g., shapefile, or geopackage)
                 GeoDataFrame: the geometry type must be `Polygon`
+        other_values (Optional[list | str]): Other raster values used in cross-tabulation.
         no_data (Optional[int or float]): A no data value to mask. Default is 0.
-        raster_value (Optional[int or list]): A raster value to get statistics for. Default is None.
+        raster_value (Optional[int | list]): A raster value to get statistics for. Default is None.
         unique_column (Optional[str]): A unique column identifier for `zones`.
             Default is None, which treats all zones as unique and uses the
             highest (resolution) level geometry.
         band (Optional[int]): The band to calculate (if multi-band). Default is None, or calculate all bands.
-        column_prefix (Optional[str]): A name to prepend to each band (column) name.
+        column_prefix (Optional[str]): A name to prepend to each band (column) output name.
         verbose (Optional[int]): The verbosity level. Default is 0.
         n_jobs (Optional[int]): The number of parallel processes (zones). Default is 1.
             *Currently, this only works with one statistic.
@@ -503,6 +560,7 @@ class RasterStats(ZonesMixin):
     def __init__(self,
                  values,
                  zones,
+                 other_values=None,
                  no_data=0,
                  raster_value=None,
                  unique_column=None,
@@ -513,6 +571,7 @@ class RasterStats(ZonesMixin):
 
         self.values = values
         self.zones = zones
+        self.other_values = other_values
         self.no_data = no_data
         self.raster_value = raster_value
         self.unique_column = unique_column
@@ -524,6 +583,11 @@ class RasterStats(ZonesMixin):
         self.stats = None
         self.zone_values = None
         self.open_bands = self.band if isinstance(self.band, int) else -1
+
+        if self.other_values:
+
+            if isinstance(self.other_values, str):
+                self.other_values = [self.other_values]
 
     def zone_iter(self, stats):
 
@@ -557,25 +621,36 @@ class RasterStats(ZonesMixin):
                 if not geom:
                     continue
 
-                # image_bounds = Polygon([(self.values_src.left, self.values_src.top),
-                #                         (self.values_src.right, self.values_src.top),
-                #                         (self.values_src.right, self.values_src.bottom),
-                #                         (self.values_src.left, self.values_src.bottom)])
-                #
-                # # Check if the geometry is within the image bounds
-                # if not geom.within(image_bounds):
-                #     continue
-
                 # Rasterize the data
-                poly_array, image_array, left, top, right, bottom = rasterize(geom,
-                                                                              proj4,
-                                                                              self.values_src,
-                                                                              self.values,
-                                                                              self.open_bands)
+                poly_array, image_array, left, top, right, bottom = rasterize_zone(geom,
+                                                                                   proj4,
+                                                                                   self.values_src,
+                                                                                   self.values,
+                                                                                   self.open_bands)
+
+                other_image_array_list = []
+
+                if self.other_values and isinstance(self.other_values, list):
+
+                    for other_values_src_, other_values_ in zip(self.other_values_src, self.other_values):
+
+                        other_image_array = rasterize_zone(geom,
+                                                           proj4,
+                                                           other_values_src_,
+                                                           other_values_,
+                                                           self.open_bands,
+                                                           return_poly=False)
+
+                        other_image_array_list.append(other_image_array)
 
                 if isinstance(self.raster_value, int):
 
                     image_array = np.where(image_array == self.raster_value, 1, 0)
+
+                    if self.other_values and isinstance(self.other_values, list):
+
+                        for oidx, other_array_ in enumerate(other_image_array_list):
+                            other_image_array_list[oidx] = np.where(other_array_ == self.raster_value, 1, 0)
 
                     if image_array.max() == 0:
                         continue
@@ -584,16 +659,37 @@ class RasterStats(ZonesMixin):
 
                     image_array_ = np.zeros(image_array.shape, dtype='uint8')
 
+                    if self.other_values and isinstance(self.other_values, list):
+
+                        other_zeros_list = []
+
+                        for oidx, other_array_ in enumerate(other_image_array_list):
+                            other_zeros_list.append(np.zeros(other_array_.shape, dtype='uint8'))
+
                     for raster_value_ in self.raster_value:
+
                         image_array_ = np.where(image_array == raster_value_, 1, image_array_)
 
+                        if self.other_values and isinstance(self.other_values, list):
+
+                            for oidx, other_array_ in enumerate(other_image_array_list):
+                                other_zeros_list[oidx] = np.where(other_array_ == raster_value_, 1, other_zeros_list[oidx])
+
                     image_array = image_array_
+
+                    if self.other_values and isinstance(self.other_values, list):
+                        other_image_array_list = other_zeros_list
 
                     if image_array.max() == 0:
                         continue
 
                 if not isinstance(poly_array, np.ndarray):
+
                     image_array = np.array([0], dtype='float32')
+
+                    if self.other_values and isinstance(self.other_values, list):
+                        other_image_array_list = [np.array([0], dtype='float32') for i_ in range(0, len(other_image_array_list))]
+
                 else:
 
                     null_idx = np.where(poly_array == 0)
@@ -603,10 +699,24 @@ class RasterStats(ZonesMixin):
                         if len(image_array.shape) > 2:
 
                             for ix in range(0, image_array.shape[0]):
+
                                 image_array[ix][null_idx] = self.no_data
 
+                                if self.other_values and isinstance(self.other_values, list):
+
+                                    for oidx, other_array_ in enumerate(other_image_array_list):
+                                        other_array_[ix][null_idx] = self.no_data
+                                        other_image_array_list[oidx] = other_array_
+
                         else:
+
                             image_array[null_idx] = self.no_data
+
+                            if self.other_values and isinstance(self.other_values, list):
+
+                                for oidx, other_array_ in enumerate(other_image_array_list):
+                                    other_array_[null_idx] = self.no_data
+                                    other_image_array_list[oidx] = other_array_
 
                     if any(['nan' in x for x in stats]):
 
@@ -618,10 +728,32 @@ class RasterStats(ZonesMixin):
                         if np.isnan(bn.nanmax(image_array)):
                             continue
 
-                self.zone_values = update_dict(didx,
-                                               self.zone_values,
-                                               image_array,
-                                               stats,
-                                               self.band,
-                                               self.no_data,
-                                               self.values_src.count)
+                        if self.other_values and isinstance(self.other_values, list):
+
+                            for oidx, other_array_ in enumerate(other_image_array_list):
+
+                                other_no_data_idx = np.where(other_array_ == self.no_data)
+
+                                if no_data_idx[0].shape[0] > 0:
+                                    other_array_[other_no_data_idx] = np.nan
+
+                if stats[0] == 'crosstab':
+
+                    self.zone_values = update_crosstab_dict(didx,
+                                                            self.zone_values,
+                                                            image_array,
+                                                            other_image_array_list,
+                                                            self.band,
+                                                            self.values_src.count,
+                                                            self.values,
+                                                            self.other_values)
+
+                else:
+
+                    self.zone_values = update_dict(didx,
+                                                   self.zone_values,
+                                                   image_array,
+                                                   stats,
+                                                   self.band,
+                                                   self.no_data,
+                                                   self.values_src.count)

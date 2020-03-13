@@ -2,7 +2,7 @@
 
 [![MIT license](https://img.shields.io/badge/License-MIT-black.svg)](https://lbesson.mit-license.org/)
 [![Python 3.6](https://img.shields.io/badge/python-3.x-black.svg)](https://www.python.org/downloads/release/python-360/)
-![Package version](https://img.shields.io/badge/version-0.2.12-blue.svg?cacheSeconds=2592000)
+![Package version](https://img.shields.io/badge/version-0.3.0-blue.svg?cacheSeconds=2592000)
 
 Zonal statistics on raster data
 ---
@@ -144,6 +144,16 @@ The default 'no data' value is 0, but it can be specified. Note that 'no data' v
 >>>
 >>> # Melt the data into columns
 >>> df = zs.melt_dist(df)
+```
+
+```python
+>>> zs = zones.RasterStats('values.tif', 'zones.shp', other_values='other.tif', n_jobs=1)
+>>>
+>>> # Calculate the cross-tabulation of two categorical rasters (new in version 0.3.0)
+>>> df = zs.calculate('crosstab')
+>>>
+>>> # Melt the frequencies
+>>> df = zs.melt_freq(df)
 ```
 
 ### Testing
