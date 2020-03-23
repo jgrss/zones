@@ -10,9 +10,10 @@ from . import util
 
 import numpy as np
 from osgeo import gdal, ogr, osr
+from osgeo.gdalconst import GA_ReadOnly
+from affine import Affine
 import xarray as xr
 import shapely
-# from shapely.geometry import Polygon
 import bottleneck as bn
 import rasterio as rio
 
@@ -191,14 +192,22 @@ def rasterize_zone(geom, proj4, image_src, image_name, open_bands, return_poly=T
         #                        num_threads=1,
         #                        warp_mem_limit=256)
 
-        out_ds = warp(image_name,
-                      '',
-                      format='MEM',
-                      out_proj=image_src.crs.to_wkt(),
-                      cell_size=image_src.res[0],
-                      multithread=True,
-                      outputBounds=[left, bottom, right, top],
-                      warpMemoryLimit=256)
+        # Full image transform
+        transform = Affine(image_src.res[0], 0.0, image_src.bounds.left, 0.0, -image_src.res[0], image_src.bounds.top)
+
+        # Upper left indices of the feature
+        j, i = ~transform * (left, top)
+
+        out_ds = gdal.Open(image_name, GA_ReadOnly)
+
+        # out_ds = warp(image_name,
+        #               '',
+        #               format='MEM',
+        #               out_proj=image_src.crs.to_wkt(),
+        #               cell_size=image_src.res[0],
+        #               multithread=True,
+        #               outputBounds=[left, bottom, right, top],
+        #               warpMemoryLimit=256)
 
         if out_ds:
 
@@ -212,7 +221,7 @@ def rasterize_zone(geom, proj4, image_src, image_name, open_bands, return_poly=T
             else:
                 open_bands_range = open_bands
 
-            image_array = np.array([out_ds.GetRasterBand(band_idx).ReadAsArray()
+            image_array = np.array([out_ds.GetRasterBand(band_idx).ReadAsArray(j, i, xcount, ycount)
                                     for band_idx in open_bands_range], dtype='float32')
 
             out_ds = None
