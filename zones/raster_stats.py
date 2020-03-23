@@ -197,6 +197,7 @@ def rasterize_zone(geom, proj4, image_src, image_name, open_bands, return_poly=T
 
         # Upper left indices of the feature
         j, i = ~transform * (left, top)
+        j, i = int(j), int(i)
 
         out_ds = gdal.Open(image_name, GA_ReadOnly)
 
@@ -351,7 +352,7 @@ def update_crosstab_dict(didx,
     else:
 
         if isinstance(band, int):
-            zones_dict[band][didx][0] = stat_func(image_array[band-1], other_image_array[band-1])
+            zones_dict[band][didx][0] = stat_func(image_array[band-1], other_image_array_list[band-1])
         else:
 
             for bidx in range(1, image_bands+1):
