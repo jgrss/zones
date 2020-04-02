@@ -15,7 +15,6 @@ from osgeo import osr
 import pandas as pd
 import xarray as xr
 import rasterio as rio
-from rasterio.crs import CRS
 import geopandas as gpd
 import six
 import shapely
@@ -505,7 +504,7 @@ def grid(bounds, gy, gx, celly, cellx, crs=None):
                                   (left + j * gx, top - (i * gy) - gy),
                                   (left + j * gx, top - i * gy)]))
 
-    return gpd.GeoDataFrame(data=range(0, len(polys)),
+    return gpd.GeoDataFrame(data=np.array(list(range(0, len(polys))), dtype='int64'),
                             columns=['grid'],
                             geometry=polys,
                             crs=crs)
