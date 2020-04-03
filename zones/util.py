@@ -14,11 +14,16 @@ def check_crs(crs):
         crs (``CRS`` | int | dict | str): The CRS instance.
 
     Returns:
-        ``str`` as proj4
+        ``str`` as WKT
     """
 
     if isinstance(crs, pyproj.crs.crs.CRS) or isinstance(crs, pyproj.crs.CRS):
-        dst_crs = CRS.from_proj4(crs.to_proj4())
+
+        if crs.is_geographic:
+            dst_crs = CRS.from_wkt("""GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]]""")
+        else:
+            dst_crs = CRS.from_wkt(crs.to_wkt())
+
     elif isinstance(crs, CRS):
         dst_crs = crs
     elif isinstance(crs, int):
@@ -36,7 +41,7 @@ def check_crs(crs):
         logger.exception('  The CRS was not understood.')
         raise TypeError
 
-    return dst_crs.to_proj4()
+    return dst_crs.to_wkt()
 
 
 def check_axis_order(spatial_reference):
