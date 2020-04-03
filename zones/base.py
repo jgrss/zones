@@ -315,18 +315,18 @@ class ZonesMixin(object):
                     other_src.close()
                     other_src = None
 
-    def _prepare_proj4(self):
+    def _prepare_crs(self):
 
-        proj4 = util.check_crs(self.zones_df.crs)
+        crs_wkt = util.check_crs(self.zones_df.crs)
 
-        if not proj4:
+        if not crs_wkt:
 
             sr = osr.SpatialReference()
             util.check_axis_order(sr)
             sr.ImportFromWkt(self.values_src.projection)
-            proj4 = sr.ExportToProj4()
+            crs_wkt = sr.ExportToWkt()
 
-        return proj4
+        return crs_wkt
 
     def check_arguments(self, stats):
 
