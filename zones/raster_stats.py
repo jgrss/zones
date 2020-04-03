@@ -91,7 +91,7 @@ def warp(input_image,
     return out_ds
 
 
-def rasterize_zone(geom, proj4, image_src, image_name, open_bands, return_poly=True):
+def rasterize_zone(geom, src_wkt, image_src, image_name, open_bands, return_poly=True):
 
     """
     Rasterizes a polygon geometry
@@ -102,7 +102,7 @@ def rasterize_zone(geom, proj4, image_src, image_name, open_bands, return_poly=T
     # Create a memory layer to rasterize from.
     datasource = ogr.GetDriverByName('Memory').CreateDataSource('wrk')
     sp_ref = osr.SpatialReference()
-    sp_ref.ImportFromProj4(proj4)
+    sp_ref.ImportFromWkt(src_wkt)
     util.check_axis_order(sp_ref)
 
     # Transform the geometry
@@ -369,7 +369,7 @@ def update_crosstab_dict(didx,
     return zones_dict
 
 
-def worker(didx, df_row, stats, n_stats, proj4, raster_value, no_data, verbose, n, band, open_bands, values):
+def worker(didx, df_row, stats, n_stats, src_wkt, raster_value, no_data, verbose, n, band, open_bands, values):
 
     if verbose > 1:
 
@@ -398,7 +398,7 @@ def worker(didx, df_row, stats, n_stats, proj4, raster_value, no_data, verbose, 
         return data_values
 
     # Rasterize the data
-    poly_array, image_array, left, top, right, bottom = rasterize_zone(geom, proj4, values_src, values, open_bands)
+    poly_array, image_array, left, top, right, bottom = rasterize_zone(geom, src_wkt, values_src, values, open_bands)
 
     # Cases where multi-band images are flattened
     #   because of single-zone pixels
@@ -496,7 +496,7 @@ def worker(didx, df_row, stats, n_stats, proj4, raster_value, no_data, verbose, 
     return data_values
 
 
-def calc_parallel(stats, proj4, raster_value, no_data, verbose, n, zones_df, values, band, open_bands, n_jobs):
+def calc_parallel(stats, src_wkt, raster_value, no_data, verbose, n, zones_df, values, band, open_bands, n_jobs):
 
     n_stats = len(stats)
 
@@ -505,7 +505,7 @@ def calc_parallel(stats, proj4, raster_value, no_data, verbose, n, zones_df, val
                                                         dfrow,
                                                         stats,
                                                         n_stats,
-                                                        proj4,
+                                                        src_wkt,
                                                         raster_value,
                                                         no_data,
                                                         verbose,
@@ -601,7 +601,7 @@ class RasterStats(ZonesMixin):
 
     def zone_iter(self, stats):
 
-        proj4 = self._prepare_proj4()
+        src_crs = self._prepare_crs()
 
         n = self.zones_df.shape[0]
 
@@ -611,7 +611,7 @@ class RasterStats(ZonesMixin):
         if self.n_jobs != 1:
 
             self.zone_values = calc_parallel(stats,
-                                             proj4,
+                                             src_crs,
                                              self.raster_value,
                                              self.no_data,
                                              self.verbose,
@@ -633,7 +633,7 @@ class RasterStats(ZonesMixin):
 
                 # Rasterize the data
                 poly_array, image_array, left, top, right, bottom = rasterize_zone(geom,
-                                                                                   proj4,
+                                                                                   src_crs,
                                                                                    self.values_src,
                                                                                    self.values,
                                                                                    self.open_bands)
@@ -645,7 +645,7 @@ class RasterStats(ZonesMixin):
                     for other_values_src_, other_values_ in zip(self.other_values_src, self.other_values):
 
                         other_image_array = rasterize_zone(geom,
-                                                           proj4,
+                                                           src_crs,
                                                            other_values_src_,
                                                            other_values_,
                                                            self.open_bands,
