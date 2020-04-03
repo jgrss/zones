@@ -149,8 +149,8 @@ def rasterize_zone(geom, src_wkt, image_src, image_name, open_bands, return_poly
         datasource = None
         target_ds = None
 
-    bottom = top - (ycount * image_src.res[0])
-    right = left + (xcount * image_src.res[0])
+    bottom = top - (ycount * abs(image_src.res[1]))
+    right = left + (xcount * abs(image_src.res[0]))
 
     if isinstance(image_name, str):
 
@@ -193,10 +193,10 @@ def rasterize_zone(geom, src_wkt, image_src, image_name, open_bands, return_poly
         #                        warp_mem_limit=256)
 
         # Full image transform
-        transform = Affine(image_src.res[0], 0.0, image_src.bounds.left, 0.0, -image_src.res[0], image_src.bounds.top)
+        transform = Affine(image_src.res[0], 0.0, image_src.bounds.left, 0.0, -image_src.res[1], image_src.bounds.top)
 
         # Upper left indices of the feature
-        j, i = ~transform * (left, top)
+        j, i = ~transform * (left+abs(image_src.res[1])/2.0, top-abs(image_src.res[0])/2.0)
         j, i = int(j), int(i)
 
         out_ds = gdal.Open(image_name, GA_ReadOnly)
@@ -204,6 +204,7 @@ def rasterize_zone(geom, src_wkt, image_src, image_name, open_bands, return_poly
         # out_ds = warp(image_name,
         #               '',
         #               format='MEM',
+        #               in_proj=image_src.crs.to_wkt(),
         #               out_proj=image_src.crs.to_wkt(),
         #               cell_size=image_src.res[0],
         #               multithread=True,
