@@ -26,7 +26,7 @@ def check_crs(crs):
         try:
             dst_crs = CRS.from_epsg(crs.to_epsg())
         except:
-            dst_crs = check_crs(crs.to_wkt())
+            dst_crs = CRS.from_string(crs.to_wkt())
 
     elif isinstance(crs, CRS):
         dst_crs = crs
