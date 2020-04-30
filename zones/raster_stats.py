@@ -116,8 +116,8 @@ def rasterize_zone(geom, src_wkt, image_src, image_name, open_bands, return_poly
     # Get the transformation boundary
     left, right, bottom, top = gdal_geom.GetEnvelope()
 
-    xcount = int(round((right - left) / image_src.res[0]))
-    ycount = int(round((top - bottom) / image_src.res[0]))
+    xcount = int(round((right - left) / abs(image_src.res[0])))
+    ycount = int(round((top - bottom) / abs(image_src.res[1])))
 
     if return_poly:
 
@@ -202,8 +202,8 @@ def rasterize_zone(geom, src_wkt, image_src, image_name, open_bands, return_poly
         min_right = min(right, image_src.bounds.right)
         max_bottom = max(bottom, image_src.bounds.bottom)
 
-        xcount = int(round((min_right - max_left) / image_src.res[0]))
-        ycount = int(round((min_top - max_bottom) / image_src.res[0]))
+        xcount = int(round((min_right - max_left) / abs(image_src.res[0])))
+        ycount = int(round((min_top - max_bottom) / abs(image_src.res[1])))
 
         # Upper left indices of the feature
         vctj, vcti = ~vct_transform * (max_left + abs(image_src.res[1]) / 2.0, min_top - abs(image_src.res[0]) / 2.0)
