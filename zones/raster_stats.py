@@ -192,14 +192,24 @@ def rasterize_zone(geom, src_wkt, image_src, image_name, open_bands, return_poly
         #                        num_threads=1,
         #                        warp_mem_limit=256)
 
+        vct_transform = Affine(image_src.res[0], 0.0, left, 0.0, -image_src.res[1], top)
+
         # Full image transform
         transform = Affine(image_src.res[0], 0.0, image_src.bounds.left, 0.0, -image_src.res[1], image_src.bounds.top)
 
+        max_left = max(left, image_src.bounds.left)
+        min_top = min(top, image_src.bounds.top)
+
         # Upper left indices of the feature
-        j, i = ~transform * (left+abs(image_src.res[1])/2.0, top-abs(image_src.res[0])/2.0)
+        vctj, vcti = ~vct_transform * (max_left + abs(image_src.res[1]) / 2.0, min_top - abs(image_src.res[0]) / 2.0)
+        vctj, vcti = int(vctj), int(vcti)
+
+        j, i = ~transform * (max_left+abs(image_src.res[1])/2.0, min_top-abs(image_src.res[0])/2.0)
         j, i = int(j), int(i)
 
         out_ds = gdal.Open(image_name, GA_ReadOnly)
+
+        poly_array = poly_array[vcti:vcti+ycount, vctj:vctj+xcount]
 
         # out_ds = warp(image_name,
         #               '',
