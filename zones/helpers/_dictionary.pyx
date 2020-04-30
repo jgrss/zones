@@ -77,7 +77,7 @@ def create_dictionary(unsigned int dict_len,
     cdef:
         vector[double] values = np.zeros(n_stats, dtype='float64')
 
-    if n_bands > 0:
+    if n_bands > 1:
         return _create_dictionary_multi_band(dict_len, values, n_bands)
     else:
         return _create_dictionary(dict_len, values)
