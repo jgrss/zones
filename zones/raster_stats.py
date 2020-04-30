@@ -199,6 +199,11 @@ def rasterize_zone(geom, src_wkt, image_src, image_name, open_bands, return_poly
 
         max_left = max(left, image_src.bounds.left)
         min_top = min(top, image_src.bounds.top)
+        min_right = min(right, image_src.bounds.right)
+        max_bottom = max(bottom, image_src.bounds.bottom)
+
+        xcount = int(round((min_right - max_left) / image_src.res[0]))
+        ycount = int(round((min_top - max_bottom) / image_src.res[0]))
 
         # Upper left indices of the feature
         vctj, vcti = ~vct_transform * (max_left + abs(image_src.res[1]) / 2.0, min_top - abs(image_src.res[0]) / 2.0)
