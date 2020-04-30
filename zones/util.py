@@ -23,10 +23,10 @@ def check_crs(crs):
         #     dst_crs = CRS.from_wkt("""GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]]""")
         # else:
 
-        try:
+        if isinstance(crs.to_epsg(), int):
             dst_crs = CRS.from_epsg(crs.to_epsg())
-        except:
-            dst_crs = CRS.from_string(crs.to_wkt())
+        else:
+            dst_crs = CRS.from_string(crs.srs)
 
     elif isinstance(crs, CRS):
         dst_crs = crs
