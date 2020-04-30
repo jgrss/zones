@@ -531,7 +531,7 @@ def voronoi(dataframe, grid_size=100, sample_size=10):
 
     geom = dataframe.geometry.values[0]
 
-    left, bottom, right, top = dataframe.total_bounds.values.flatten().tolist()
+    left, bottom, right, top = dataframe.total_bounds.flatten().tolist()
 
     randx = np.random.choice(np.linspace(left, right, grid_size), size=int(sample_size), replace=False)
     randy = np.random.choice(np.linspace(top, bottom, grid_size), size=int(sample_size), replace=False)
