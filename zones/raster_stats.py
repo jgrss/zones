@@ -145,7 +145,7 @@ def rasterize_zone(geom, src_wkt, image_src, image_name, open_bands, return_poly
     if return_poly:
 
         # Get the transform for the full vector extent
-        vct_transform = Affine(image_src.res[0], 0.0, left, 0.0, -image_src.res[1], top)
+        vct_transform = Affine(abs(image_src.res[0]), 0.0, left, 0.0, -abs(image_src.res[1]), top)
 
         # Create the new layer
         lyr = datasource.CreateLayer('', geom_type=ogr.wkbPolygon, srs=target_sr)
