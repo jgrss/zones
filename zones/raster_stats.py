@@ -99,6 +99,17 @@ def rasterize_zone(geom, src_wkt, image_src, image_name, open_bands, return_poly
 
     # left, bottom, right, top = geom.bounds
 
+    # TODO: clip geometry first?
+    # import geopandas as gpd
+    # from shapely.geometry import Polygon
+    # polygon = Polygon([(image_src.bounds.left, image_src.bounds.bottom),
+    #                    (image_src.bounds.left, image_src.bounds.top),
+    #                    (image_src.bounds.right, image_src.bounds.top),
+    #                    (image_src.bounds.right, image_src.bounds.bottom),
+    #                    (image_src.bounds.left, image_src.bounds.bottom)])
+    #
+    # geom = gpd.clip(geom, polygon)
+
     # Create a memory layer to rasterize from.
     datasource = ogr.GetDriverByName('Memory').CreateDataSource('wrk')
     sp_ref = osr.SpatialReference()
@@ -116,10 +127,25 @@ def rasterize_zone(geom, src_wkt, image_src, image_name, open_bands, return_poly
     # Get the transformation boundary
     left, right, bottom, top = gdal_geom.GetEnvelope()
 
-    xcount = int(round((right - left) / abs(image_src.res[0])))
-    ycount = int(round((top - bottom) / abs(image_src.res[1])))
+    # Get the y and x count of the vector geometry
+    xcount_vct = int(round((right - left) / abs(image_src.res[0])))
+    ycount_vct = int(round((top - bottom) / abs(image_src.res[1])))
+
+    # Get the minimum overlapping extent bounds
+    #   between the raster and the vector geometry
+    max_left = max(left, image_src.bounds.left)
+    min_top = min(top, image_src.bounds.top)
+    min_right = min(right, image_src.bounds.right)
+    max_bottom = max(bottom, image_src.bounds.bottom)
+
+    # Get the y and x count based on the minimum bounds
+    xcount = int(round((min_right - max_left) / abs(image_src.res[0])))
+    ycount = int(round((min_top - max_bottom) / abs(image_src.res[1])))
 
     if return_poly:
+
+        # Get the transform for the full vector extent
+        vct_transform = Affine(image_src.res[0], 0.0, left, 0.0, -image_src.res[1], top)
 
         # Create the new layer
         lyr = datasource.CreateLayer('', geom_type=ogr.wkbPolygon, srs=target_sr)
@@ -132,25 +158,31 @@ def rasterize_zone(geom, src_wkt, image_src, image_name, open_bands, return_poly
         feature.SetField('Value', 1)
         lyr.CreateFeature(feature)
 
-        # Create a raster to rasterize into.
+        # Create an in-memory object to rasterize to
         try:
-            target_ds = gdal.GetDriverByName('MEM').Create('', xcount, ycount, 1, gdal.GDT_Byte)
+            target_ds = gdal.GetDriverByName('MEM').Create('', xcount_vct, ycount_vct, 1, gdal.GDT_Byte)
         except:
             return None, None, None, None, None, None
 
-        target_ds.SetGeoTransform([left, image_src.res[0], 0., top, 0., -image_src.res[0]])
+        # Set the transform and CRS
+        target_ds.SetGeoTransform([left, abs(image_src.res[0]), 0., top, 0., -abs(image_src.res[0])])
         target_ds.SetProjection(target_sr.ExportToWkt())
 
-        # Rasterize
+        # Rasterize the geometry
         gdal.RasterizeLayer(target_ds, [1], lyr, options=['ATTRIBUTE=Value'])
 
-        poly_array = np.uint8(target_ds.GetRasterBand(1).ReadAsArray())
+        # Get the upper left offsets of the geometry
+        vctj, vcti = ~vct_transform * (max_left + abs(image_src.res[1]) / 2.0, min_top - abs(image_src.res[0]) / 2.0)
+        vctj, vcti = int(vctj), int(vcti)
+
+        # Read the geometry as an array
+        poly_array = np.uint8(target_ds.GetRasterBand(1).ReadAsArray(vctj, vcti, xcount, ycount))
 
         datasource = None
         target_ds = None
 
-    bottom = top - (ycount * abs(image_src.res[1]))
-    right = left + (xcount * abs(image_src.res[0]))
+    # bottom = top - (ycount * abs(image_src.res[1]))
+    # right = left + (xcount * abs(image_src.res[0]))
 
     if isinstance(image_name, str):
 
@@ -192,29 +224,14 @@ def rasterize_zone(geom, src_wkt, image_src, image_name, open_bands, return_poly
         #                        num_threads=1,
         #                        warp_mem_limit=256)
 
-        vct_transform = Affine(image_src.res[0], 0.0, left, 0.0, -image_src.res[1], top)
+        # Get the transform for the full image extent
+        transform = Affine(abs(image_src.res[0]), 0.0, image_src.bounds.left, 0.0, -abs(image_src.res[1]), image_src.bounds.top)
 
-        # Full image transform
-        transform = Affine(image_src.res[0], 0.0, image_src.bounds.left, 0.0, -image_src.res[1], image_src.bounds.top)
-
-        max_left = max(left, image_src.bounds.left)
-        min_top = min(top, image_src.bounds.top)
-        min_right = min(right, image_src.bounds.right)
-        max_bottom = max(bottom, image_src.bounds.bottom)
-
-        xcount = int(round((min_right - max_left) / abs(image_src.res[0])))
-        ycount = int(round((min_top - max_bottom) / abs(image_src.res[1])))
-
-        # Upper left indices of the feature
-        vctj, vcti = ~vct_transform * (max_left + abs(image_src.res[1]) / 2.0, min_top - abs(image_src.res[0]) / 2.0)
-        vctj, vcti = int(vctj), int(vcti)
-
-        j, i = ~transform * (max_left+abs(image_src.res[1])/2.0, min_top-abs(image_src.res[0])/2.0)
+        # Get the upper left offsets of the minimum bounds
+        j, i = ~transform * (max_left + abs(image_src.res[1]) / 2.0, min_top - abs(image_src.res[0]) / 2.0)
         j, i = int(j), int(i)
 
         out_ds = gdal.Open(image_name, GA_ReadOnly)
-
-        poly_array = poly_array[vcti:vcti+ycount, vctj:vctj+xcount]
 
         # out_ds = warp(image_name,
         #               '',
@@ -238,6 +255,7 @@ def rasterize_zone(geom, src_wkt, image_src, image_name, open_bands, return_poly
             else:
                 open_bands_range = open_bands
 
+            # Read the raster data as arrays
             image_array = np.array([out_ds.GetRasterBand(band_idx).ReadAsArray(j, i, xcount, ycount)
                                     for band_idx in open_bands_range], dtype='float32')
 
