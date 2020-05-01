@@ -169,7 +169,7 @@ class ZonesMixin(object):
         if self.values_src:
             self.n_bands = self.values_src.count
         else:
-            self.n_bands = 1
+            self.n_bands = 0
 
         if self.other_values:
             self.n_other_images = len(self.other_values)
