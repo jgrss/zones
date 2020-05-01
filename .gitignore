@@ -22,4 +22,5 @@ dist/
 
 # zones
 doc/
+zones.egg-info/
 
