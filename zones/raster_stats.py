@@ -12,8 +12,10 @@ import numpy as np
 from osgeo import gdal, ogr, osr
 from osgeo.gdalconst import GA_ReadOnly
 from affine import Affine
+import geopandas as gpd
 import xarray as xr
 import shapely
+from shapely.geometry import Polygon
 import bottleneck as bn
 import rasterio as rio
 
@@ -97,18 +99,22 @@ def rasterize_zone(geom, src_wkt, image_src, image_name, open_bands, return_poly
     Rasterizes a polygon geometry
     """
 
-    # left, bottom, right, top = geom.bounds
+    left, bottom, right, top = geom.bounds
 
-    # TODO: clip geometry first?
-    # import geopandas as gpd
-    # from shapely.geometry import Polygon
-    # polygon = Polygon([(image_src.bounds.left, image_src.bounds.bottom),
-    #                    (image_src.bounds.left, image_src.bounds.top),
-    #                    (image_src.bounds.right, image_src.bounds.top),
-    #                    (image_src.bounds.right, image_src.bounds.bottom),
-    #                    (image_src.bounds.left, image_src.bounds.bottom)])
-    #
-    # geom = gpd.clip(geom, polygon)
+    if (left < image_src.bounds.left) or \
+            (bottom < image_src.bounds.bottom) or \
+            (right > image_src.bounds.right) or \
+            (top > image_src.bounds.top):
+
+        # Clip the geometry to the raster extent
+        raster_polygon = Polygon([(image_src.bounds.left, image_src.bounds.bottom),
+                                  (image_src.bounds.left, image_src.bounds.top),
+                                  (image_src.bounds.right, image_src.bounds.top),
+                                  (image_src.bounds.right, image_src.bounds.bottom),
+                                  (image_src.bounds.left, image_src.bounds.bottom)])
+
+        geom_df = gpd.GeoDataFrame(data=[0], geometry=[geom], crs=src_wkt)
+        geom = gpd.clip(geom_df, raster_polygon).geometry[0]
 
     # Create a memory layer to rasterize from.
     datasource = ogr.GetDriverByName('Memory').CreateDataSource('wrk')
