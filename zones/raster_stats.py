@@ -114,6 +114,11 @@ def rasterize_zone(geom, src_wkt, image_src, image_name, open_bands, return_poly
                                   (image_src.bounds.left, image_src.bounds.bottom)])
 
         geom_df = gpd.GeoDataFrame(data=[0], geometry=[geom], crs=src_wkt)
+        geom_df = gpd.clip(geom_df, raster_polygon)
+
+        if geom_df.empty:
+            return None, None, None, None, None, None
+
         geom = gpd.clip(geom_df, raster_polygon).geometry[0]
 
     # Create a memory layer to rasterize from.
