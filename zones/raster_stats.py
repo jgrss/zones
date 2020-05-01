@@ -280,7 +280,7 @@ def rasterize_zone(geom, src_wkt, image_src, image_name, open_bands, return_poly
                                              x=slice(left, bottom)).values
 
     if return_poly:
-        return poly_array, np.squeeze(image_array), left, top, right, bottom
+        return poly_array, np.squeeze(image_array), max_left, min_top, min_right, max_bottom
     else:
         return np.squeeze(image_array)
 
