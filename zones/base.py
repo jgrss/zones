@@ -18,6 +18,7 @@ import rasterio as rio
 import geopandas as gpd
 import six
 import shapely
+from shapely import speedups
 from shapely.geometry import Point, Polygon
 
 try:
@@ -26,7 +27,8 @@ try:
 except:
     EARTHPY_INSTALLED = False
 
-shapely.speedups.enable()
+
+speedups.enable()
 
 
 class ZonesMixin(object):
@@ -510,6 +512,29 @@ def grid(bounds, gy, gx, celly, cellx, crs=None):
                             crs=crs)
 
 
+def geometry_from_dataframe(dataframe):
+
+    """
+    Gets the geometry of a DataFrame's total bounds
+
+    Args:
+        dataframe (DataFrame): The DataFrame.
+
+    Returns:
+        ``shapely.geometry.Polygon``
+    """
+
+    left, bottom, right, top = dataframe.total_bounds.flatten().tolist()
+
+    geom = Polygon([(left, bottom),
+                    (left, top),
+                    (right, top),
+                    (right, bottom),
+                    (left, bottom)])
+
+    return geom
+
+
 def voronoi(dataframe, grid_size=100, sample_size=10):
 
     """
@@ -529,7 +554,7 @@ def voronoi(dataframe, grid_size=100, sample_size=10):
         logger.exception('  earthpy must be installed to create voronoi polygons')
         raise ImportError
 
-    geom = dataframe.geometry.values[0]
+    geom = geometry_from_dataframe(dataframe)
 
     left, bottom, right, top = dataframe.total_bounds.flatten().tolist()
 
