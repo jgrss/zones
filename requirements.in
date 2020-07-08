@@ -1,7 +1,6 @@
 cython
 numpy
 bottleneck
-earthpy
 geopandas
 joblib
 pandas

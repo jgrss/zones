@@ -21,12 +21,6 @@ import shapely
 from shapely import speedups
 from shapely.geometry import Point, Polygon
 
-try:
-    from earthpy import clip as cl
-    EARTHPY_INSTALLED = True
-except:
-    EARTHPY_INSTALLED = False
-
 
 speedups.enable()
 
@@ -568,6 +562,4 @@ def voronoi(dataframe, grid_size=100, sample_size=10):
     geom = [poly for poly in shapely.ops.polygonize(lines)]
     df_voronoi = gpd.GeoDataFrame(data=range(0, len(geom)), geometry=geom, crs=dataframe.crs)
 
-    df_voronoi_clip = cl.clip_shp(df_voronoi, dataframe).reset_index()
-
-    return df_voronoi_clip
+    return gpd.clip(df_voronoi, dataframe).reset_index()
