@@ -544,10 +544,6 @@ def voronoi(dataframe, grid_size=100, sample_size=10):
         ``DataFrame``
     """
 
-    if not EARTHPY_INSTALLED:
-        logger.exception('  earthpy must be installed to create voronoi polygons')
-        raise ImportError
-
     geom = geometry_from_dataframe(dataframe)
 
     left, bottom, right, top = dataframe.total_bounds.flatten().tolist()
