@@ -4,7 +4,7 @@
 [![](https://img.shields.io/badge/python-3.6%20%7C%203.7%20%7C%203.8-blue)](https://img.shields.io/badge/python-3.6%20%7C%203.7%20%7C%203.8-blue)
 ![](https://img.shields.io/badge/version-0.3.12-blue.svg?cacheSeconds=2592000)
 
-Zonal statistics on raster data
+zones: Raster and vector zonal statistics
 ---
 
 Zones is a library for summary statistics with vector and raster data. The library manages projections on-the-fly,
