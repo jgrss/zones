@@ -1,34 +1,15 @@
-[](#mit-license)[](#python-3.6)[](#package-version)
+![](data/logo.png)
 
 [![MIT license](https://img.shields.io/badge/License-MIT-black.svg)](https://lbesson.mit-license.org/)
 [![](https://img.shields.io/badge/python-3.6%20%7C%203.7%20%7C%203.8-blue)](https://img.shields.io/badge/python-3.6%20%7C%203.7%20%7C%203.8-blue)
-![](https://img.shields.io/badge/version-0.3.11-blue.svg?cacheSeconds=2592000)
+![](https://img.shields.io/badge/version-0.3.12-blue.svg?cacheSeconds=2592000)
 
 Zonal statistics on raster data
 ---
 
-The `zones` library calculates summary statistics with vector and raster data. The library manages projections on-the-fly,
+Zones is a library for summary statistics with vector and raster data. The library manages projections on-the-fly,
 so there is no need to ensure consistency prior to running. Statistics are processed per zone, so memory requirements
 scale with the size of the vector polygons.
-
-### Dependencies
-
-- Cython
-- NumPy
-- GDAL
-
-The following dependencies are installed automatically.
-
-- Bottleneck
-- EarthPy
-- GeoPandas
-- joblib
-- Pandas
-- Rasterio
-- Shapely
-- six
-- tqdm
-- Xarray
 
 ### Installation
 
@@ -38,10 +19,6 @@ Clone and build
 > git clone https://github.com/jgrss/zones.git
 > cd zones/
 > python setup.py build && python setup.py install 
->
-> # Cleanup
-> cd ../
-> rm -rf zones/
 ```
 
 or install directly from GitHub

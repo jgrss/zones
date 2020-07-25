@@ -21,6 +21,7 @@ dist/
 .ipynb_checkpoints
 
 # zones
+logo/
 doc/
 zones.egg-info/
 

@@ -162,6 +162,10 @@ class ZonesMixin(object):
 
     def prepare_zones(self, unique_column):
 
+        """
+        Prepares zones
+        """
+
         if self.values_src:
             self.n_bands = self.values_src.count
         else:
@@ -529,7 +533,7 @@ def geometry_from_dataframe(dataframe):
     return geom
 
 
-def voronoi(dataframe, grid_size=100, sample_size=10):
+def voronoi(dataframe, grid_size=100, sample_size=None, bounds=None, force_edges=False):
 
     """
     Creates Voronoi polygons from random points
@@ -537,19 +541,46 @@ def voronoi(dataframe, grid_size=100, sample_size=10):
     Args:
         dataframe (GeoDataFrame): The dataframe.
         grid_size (Optional[int]): The number of x and y coordinates to sample from.
-        sample_size (Optional[int]): The number of random points to generate. This number is not guaranteed because
-            points are clipped to geometry.
+        sample_size (Optional[float | int]): The number of random points to generate. If ``sample_size`` is a float,
+            ``sample_size`` should be between 0 and 1 and the number of samples are calculated as the fraction
+            of ``grid_size``. This number is not guaranteed because points are clipped to geometry.
+        bounds (Optional[tuple]): Bounds to sample within, given as (left, bottom, right, top).
+            If not given, bounds are taken from ``dataframe``.
+        force_edges (Optional[bool]): Whether to force the edges of the bounds.
 
     Returns:
         ``DataFrame``
     """
 
+    if not isinstance(sample_size, float) or isinstance(sample_size, int):
+        sample_size = 10
+
+    if isinstance(sample_size, float):
+        sample_size = sample_size * grid_size
+
     geom = geometry_from_dataframe(dataframe)
 
-    left, bottom, right, top = dataframe.total_bounds.flatten().tolist()
+    if bounds:
+        left, bottom, right, top = bounds
+    else:
+        left, bottom, right, top = dataframe.total_bounds.flatten().tolist()
 
     randx = np.random.choice(np.linspace(left, right, grid_size), size=int(sample_size), replace=False)
     randy = np.random.choice(np.linspace(top, bottom, grid_size), size=int(sample_size), replace=False)
+
+    if force_edges:
+
+        if left not in randx.tolist():
+            randx = np.concatenate(([left], randx))
+
+        if right not in randx.tolist():
+            randx = np.concatenate(([right], randx))
+
+        if top not in randy.tolist():
+            randy = np.concatenate(([top], randy))
+
+        if bottom not in randy.tolist():
+            randy = np.concatenate(([bottom], randy))
 
     points = [[x, y] for x, y in zip(randx, randy) if Point(x, y).within(geom)]
 
