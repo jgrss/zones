@@ -3,8 +3,9 @@ from collections import namedtuple
 import math
 import itertools
 from pathlib import Path
+import logging
 
-from .errors import logger, ValuesFileError, StatsError, ZonesFileError
+from .errors import ValuesFileError, StatsError, ZonesFileError
 from .stats import STAT_DICT
 from .helpers import create_dictionary
 from . import util
@@ -18,27 +19,33 @@ import rasterio as rio
 import geopandas as gpd
 import six
 import shapely
-from shapely import speedups
 from shapely.geometry import Point, Polygon
 
 
-speedups.enable()
+logger = logging.getLogger(__name__)
 
 
 class ZonesMixin(object):
 
+    """
+    Bases class to mixin with zonal classes
+    """
+
     @property
     def stats_avail(self):
+        """Get available statistics"""
         return list(STAT_DICT.keys())
 
     def calculate(self, stats):
 
         """
+        Calculates zonal statistics
+
         Args:
             stats (str list)
 
         Returns:
-            DataFrame
+            ``geopandas.GeoDataFrame``
         """
 
         self.stats = stats
@@ -74,7 +81,7 @@ class ZonesMixin(object):
     def check_if_geodf(data_file):
 
         """
-        Checks for file data type
+        Checks if a file is a GeoDataFrame
 
         Args:
             data_file (GeoDataFrame or image file or Xarray Dataset)
@@ -83,7 +90,7 @@ class ZonesMixin(object):
                 following attributes:  projection (str) and res (tuple)
 
         Returns:
-            data_file (GeoDataFrame)
+            data_file (``GeoDataFrame``)
         """
 
         if isinstance(data_file, gpd.GeoDataFrame):
@@ -164,6 +171,12 @@ class ZonesMixin(object):
 
         """
         Prepares zones
+
+        Args:
+            unique_column (str): The unique column name.
+
+        Returns:
+            ``dict``
         """
 
         if self.values_src:
@@ -261,6 +274,13 @@ class ZonesMixin(object):
 
     def finalize_dataframe(self):
 
+        """
+        Finalizes a DataFrame
+
+        Returns:
+            ``geopandas.GeoDataFrame``
+        """
+
         if hasattr(self, 'band'):
 
             prefix = self.column_prefix if self.column_prefix else '_bd'
@@ -331,8 +351,13 @@ class ZonesMixin(object):
     def check_arguments(self, stats):
 
         """
+        Checks if files and statistics are supported
+
         Args:
             stats (list)
+
+        Returns:
+            ``None``
         """
 
         if isinstance(self.values, str):
@@ -384,7 +409,7 @@ class ZonesMixin(object):
             >>> df = zs.melt_freq(df)
 
         Returns:
-            Melted DataFrame (DataFrame)
+            Melted ``DataFrame``
         """
 
         dfm = pd.melt(df.copy())
@@ -410,7 +435,7 @@ class ZonesMixin(object):
             >>> df = zs.melt_dist(df, id_field='id')
 
         Returns:
-            Melted DataFrame (DataFrame)
+            Melted ``DataFrame``
         """
 
         out_df = dict()
@@ -549,7 +574,7 @@ def voronoi(dataframe, grid_size=100, sample_size=None, bounds=None, force_edges
         force_edges (Optional[bool]): Whether to force the edges of the bounds.
 
     Returns:
-        ``DataFrame``
+        ``pandas.DataFrame``
     """
 
     if not isinstance(sample_size, float) or isinstance(sample_size, int):

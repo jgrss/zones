@@ -1,7 +1,11 @@
+import logging
+
 from .test_single_band import test_01_single
 from .test_single_band_parallel import test_01_parallel
 from .test_multi_band import test_01_multi
-from ..errors import logger
+
+
+logger = logging.getLogger(__name__)
 
 
 def test_raster():

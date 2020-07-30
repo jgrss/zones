@@ -4,10 +4,6 @@
 # cython: boundscheck=False
 # cython: wraparound=False
 
-"""
-@author: Jordan Graesser
-"""
-
 import cython
 cimport cython
 

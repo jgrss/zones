@@ -1,9 +1,10 @@
 from __future__ import division
+
 import itertools
 from pathlib import Path
+import logging
 
 from .base import ZonesMixin
-from .errors import logger
 from .stats import STAT_DICT
 from .helpers import merge_dictionary_keys
 from . import util
@@ -14,7 +15,6 @@ from osgeo.gdalconst import GA_ReadOnly
 from affine import Affine
 import geopandas as gpd
 import xarray as xr
-import shapely
 from shapely.geometry import Polygon
 import bottleneck as bn
 import rasterio as rio
@@ -22,7 +22,8 @@ import rasterio as rio
 from joblib import Parallel, delayed
 from tqdm import tqdm
 
-shapely.speedups.enable()
+
+logger = logging.getLogger(__name__)
 
 
 def _merge_dicts(dict1, dict2):
@@ -33,12 +34,12 @@ def _merge_dicts(dict1, dict2):
     return dict3
 
 
-def warp(input_image,
-         output_image,
-         out_proj=None,
-         in_proj=None,
-         cell_size=0,
-         **kwargs):
+def _warp(input_image,
+          output_image,
+          out_proj=None,
+          in_proj=None,
+          cell_size=0,
+          **kwargs):
 
     """
     Warp transforms a dataset
@@ -93,7 +94,7 @@ def warp(input_image,
     return out_ds
 
 
-def rasterize_zone(geom, src_wkt, image_src, image_name, open_bands, return_poly=True):
+def _rasterize_zone(geom, src_wkt, image_src, image_name, open_bands, return_poly=True):
 
     """
     Rasterizes a polygon geometry
@@ -244,7 +245,7 @@ def rasterize_zone(geom, src_wkt, image_src, image_name, open_bands, return_poly
 
         out_ds = gdal.Open(image_name, GA_ReadOnly)
 
-        # out_ds = warp(image_name,
+        # out_ds = _warp(image_name,
         #               '',
         #               format='MEM',
         #               in_proj=image_src.crs.to_wkt(),
@@ -290,7 +291,7 @@ def rasterize_zone(geom, src_wkt, image_src, image_name, open_bands, return_poly
         return np.squeeze(image_array)
 
 
-def update_dict(didx, zones_dict, image_array, stats, band, no_data, image_bands):
+def _update_dict(didx, zones_dict, image_array, stats, band, no_data, image_bands):
 
     """
     Updates the stats dictionary
@@ -365,14 +366,14 @@ def update_dict(didx, zones_dict, image_array, stats, band, no_data, image_bands
     return zones_dict
 
 
-def update_crosstab_dict(didx,
-                         zones_dict,
-                         image_array,
-                         other_image_array_list,
-                         band,
-                         image_bands,
-                         values_name,
-                         other_values_list):
+def _update_crosstab_dict(didx,
+                          zones_dict,
+                          image_array,
+                          other_image_array_list,
+                          band,
+                          image_bands,
+                          values_name,
+                          other_values_list):
 
     """
     Updates the stats dictionary
@@ -414,7 +415,7 @@ def update_crosstab_dict(didx,
     return zones_dict
 
 
-def worker(didx, df_row, stats, n_stats, src_wkt, raster_value, no_data, verbose, n, band, open_bands, values):
+def _worker(didx, df_row, stats, n_stats, src_wkt, raster_value, no_data, verbose, n, band, open_bands, values):
 
     if verbose > 1:
 
@@ -443,7 +444,7 @@ def worker(didx, df_row, stats, n_stats, src_wkt, raster_value, no_data, verbose
         return data_values
 
     # Rasterize the data
-    poly_array, image_array, left, top, right, bottom = rasterize_zone(geom, src_wkt, values_src, values, open_bands)
+    poly_array, image_array, left, top, right, bottom = _rasterize_zone(geom, src_wkt, values_src, values, open_bands)
 
     # Cases where multi-band images are flattened
     #   because of single-zone pixels
@@ -541,23 +542,23 @@ def worker(didx, df_row, stats, n_stats, src_wkt, raster_value, no_data, verbose
     return data_values
 
 
-def calc_parallel(stats, src_wkt, raster_value, no_data, verbose, n, zones_df, values, band, open_bands, n_jobs):
+def _calc_parallel(stats, src_wkt, raster_value, no_data, verbose, n, zones_df, values, band, open_bands, n_jobs):
 
     n_stats = len(stats)
 
     results = Parallel(n_jobs=n_jobs,
-                       max_nbytes=None)(delayed(worker)(didx,
-                                                        dfrow,
-                                                        stats,
-                                                        n_stats,
-                                                        src_wkt,
-                                                        raster_value,
-                                                        no_data,
-                                                        verbose,
-                                                        n,
-                                                        band,
-                                                        open_bands,
-                                                        values)
+                       max_nbytes=None)(delayed(_worker)(didx,
+                                                         dfrow,
+                                                         stats,
+                                                         n_stats,
+                                                         src_wkt,
+                                                         raster_value,
+                                                         no_data,
+                                                         verbose,
+                                                         n,
+                                                         band,
+                                                         open_bands,
+                                                         values)
                                         for didx, dfrow in zones_df.iterrows())
 
     if isinstance(band, int):
@@ -655,17 +656,17 @@ class RasterStats(ZonesMixin):
 
         if self.n_jobs != 1:
 
-            self.zone_values = calc_parallel(stats,
-                                             src_crs,
-                                             self.raster_value,
-                                             self.no_data,
-                                             self.verbose,
-                                             n,
-                                             self.zones_df,
-                                             self.values,
-                                             self.band,
-                                             self.open_bands,
-                                             self.n_jobs)
+            self.zone_values = _calc_parallel(stats,
+                                              src_crs,
+                                              self.raster_value,
+                                              self.no_data,
+                                              self.verbose,
+                                              n,
+                                              self.zones_df,
+                                              self.values,
+                                              self.band,
+                                              self.open_bands,
+                                              self.n_jobs)
 
         else:
 
@@ -677,11 +678,11 @@ class RasterStats(ZonesMixin):
                     continue
 
                 # Rasterize the data
-                poly_array, image_array, left, top, right, bottom = rasterize_zone(geom,
-                                                                                   src_crs,
-                                                                                   self.values_src,
-                                                                                   self.values,
-                                                                                   self.open_bands)
+                poly_array, image_array, left, top, right, bottom = _rasterize_zone(geom,
+                                                                                    src_crs,
+                                                                                    self.values_src,
+                                                                                    self.values,
+                                                                                    self.open_bands)
 
                 other_image_array_list = []
 
@@ -689,12 +690,12 @@ class RasterStats(ZonesMixin):
 
                     for other_values_src_, other_values_ in zip(self.other_values_src, self.other_values):
 
-                        other_image_array = rasterize_zone(geom,
-                                                           src_crs,
-                                                           other_values_src_,
-                                                           other_values_,
-                                                           self.open_bands,
-                                                           return_poly=False)
+                        other_image_array = _rasterize_zone(geom,
+                                                            src_crs,
+                                                            other_values_src_,
+                                                            other_values_,
+                                                            self.open_bands,
+                                                            return_poly=False)
 
                         other_image_array_list.append(other_image_array)
 
@@ -794,21 +795,21 @@ class RasterStats(ZonesMixin):
 
                 if stats[0] == 'crosstab':
 
-                    self.zone_values = update_crosstab_dict(didx,
-                                                            self.zone_values,
-                                                            image_array,
-                                                            other_image_array_list,
-                                                            self.band,
-                                                            self.values_src.count,
-                                                            self.values,
-                                                            self.other_values)
+                    self.zone_values = _update_crosstab_dict(didx,
+                                                             self.zone_values,
+                                                             image_array,
+                                                             other_image_array_list,
+                                                             self.band,
+                                                             self.values_src.count,
+                                                             self.values,
+                                                             self.other_values)
 
                 else:
 
-                    self.zone_values = update_dict(didx,
-                                                   self.zone_values,
-                                                   image_array,
-                                                   stats,
-                                                   self.band,
-                                                   self.no_data,
-                                                   self.values_src.count)
+                    self.zone_values = _update_dict(didx,
+                                                    self.zone_values,
+                                                    image_array,
+                                                    stats,
+                                                    self.band,
+                                                    self.no_data,
+                                                    self.values_src.count)

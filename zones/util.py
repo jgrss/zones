@@ -1,8 +1,11 @@
-from .errors import logger
+import logging
 
 from osgeo import osr
 import pyproj
 from rasterio.crs import CRS
+
+
+logger = logging.getLogger(__name__)
 
 
 def check_crs(crs):

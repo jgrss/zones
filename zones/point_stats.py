@@ -1,5 +1,6 @@
+import logging
+
 from .base import ZonesMixin
-from .errors import logger
 from .stats import STAT_DICT
 
 import pandas as pd
@@ -9,7 +10,8 @@ import shapely
 from joblib import Parallel, delayed
 from tqdm import tqdm
 
-shapely.speedups.enable()
+
+logger = logging.getLogger(__name__)
 
 
 def worker(didx, df_row, stat, value_column):

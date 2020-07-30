@@ -1,10 +1,12 @@
-# import unittest
+import logging
 
-from ..errors import logger
 from ..datasets import load_01_multi
 from .. import RasterStats
 
 import numpy as np
+
+
+logger = logging.getLogger(__name__)
 
 
 def test_01_multi():
