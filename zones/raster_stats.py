@@ -427,7 +427,7 @@ def _worker(didx, df_row, stats, n_stats, src_wkt, raster_value, no_data, verbos
     else:
         values_src = values
 
-    if values_src.count == 1:
+    if isinstance(band, int) or (values_src.count == 1):
         data_values = np.concatenate(([didx], np.zeros(n_stats, dtype='float64') + np.nan))
     else:
         data_values = np.concatenate(([didx], np.zeros(n_stats * values_src.count, dtype='float64')))
@@ -448,10 +448,16 @@ def _worker(didx, df_row, stats, n_stats, src_wkt, raster_value, no_data, verbos
 
     # Cases where multi-band images are flattened
     #   because of single-zone pixels
-    if values_src.count > 1:
-        if len(image_array.shape) == 1:
-            image_array = image_array.reshape(values_src.count, 1, 1)
+    if not isinstance(band, int) and (values_src.count > 1):
 
+        if len(image_array.shape) == 1:
+
+            if isinstance(band, int):
+                image_array = image_array.reshape(1, 1, 1)
+            else:
+                image_array = image_array.reshape(values_src.count, 1, 1)
+
+    # Binarize a specific value
     if isinstance(raster_value, int):
 
         image_array = np.where(image_array == raster_value, 1, 0)
@@ -459,6 +465,7 @@ def _worker(didx, df_row, stats, n_stats, src_wkt, raster_value, no_data, verbos
         if image_array.max() == 0:
             return_early = True
 
+    # Binarize a list of values
     elif isinstance(raster_value, list):
 
         image_array_ = np.zeros(image_array.shape, dtype='uint8')
@@ -486,7 +493,7 @@ def _worker(didx, df_row, stats, n_stats, src_wkt, raster_value, no_data, verbos
 
             if null_idx[0].shape[0] > 0:
 
-                if values_src.count > 1:
+                if not isinstance(band, int) and (values_src.count > 1):
 
                     for ix in range(0, values_src.count):
                         image_array[ix][null_idx] = no_data
@@ -508,7 +515,7 @@ def _worker(didx, df_row, stats, n_stats, src_wkt, raster_value, no_data, verbos
 
                     return data_values
 
-        if values_src.count == 1:
+        if isinstance(band, int) or (values_src.count == 1):
 
             for sidx, stat in enumerate(stats):
 
