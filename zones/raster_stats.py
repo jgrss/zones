@@ -1,6 +1,7 @@
 from __future__ import division
 
 import itertools
+import multiprocessing as multi
 from pathlib import Path
 import logging
 
@@ -415,7 +416,11 @@ def _update_crosstab_dict(didx,
     return zones_dict
 
 
-def _worker(didx, df_row, stats, n_stats, src_wkt, raster_value, no_data, verbose, n, band, open_bands, values):
+# def _worker(didx, df_row, stats, n_stats, src_wkt, raster_value, no_data, verbose, n, band, open_bands, values):
+
+def _worker(*args):
+
+    didx, df_row, stats, n_stats, src_wkt, raster_value, no_data, verbose, n, band, open_bands, values = list(itertools.chain(*args))
 
     if verbose > 1:
 
@@ -549,24 +554,44 @@ def _worker(didx, df_row, stats, n_stats, src_wkt, raster_value, no_data, verbos
     return data_values
 
 
-def _calc_parallel(stats, src_wkt, raster_value, no_data, verbose, n, zones_df, values, band, open_bands, n_jobs):
+def _calc_parallel(stats, src_wkt, raster_value, no_data, verbose, n, zones_df, values, band, open_bands, n_jobs, chunksize):
 
     n_stats = len(stats)
 
-    results = Parallel(n_jobs=n_jobs,
-                       max_nbytes=None)(delayed(_worker)(didx,
-                                                         dfrow,
-                                                         stats,
-                                                         n_stats,
-                                                         src_wkt,
-                                                         raster_value,
-                                                         no_data,
-                                                         verbose,
-                                                         n,
-                                                         band,
-                                                         open_bands,
-                                                         values)
-                                        for didx, dfrow in zones_df.iterrows())
+    # results = Parallel(n_jobs=n_jobs,
+    #                    max_nbytes=None)(delayed(_worker)(didx,
+    #                                                      dfrow,
+    #                                                      stats,
+    #                                                      n_stats,
+    #                                                      src_wkt,
+    #                                                      raster_value,
+    #                                                      no_data,
+    #                                                      verbose,
+    #                                                      n,
+    #                                                      band,
+    #                                                      open_bands,
+    #                                                      values)
+    #                                     for didx, dfrow in zones_df.iterrows())
+
+    data_gen = ((didx,
+                 dfrow,
+                 stats,
+                 n_stats,
+                 src_wkt,
+                 raster_value,
+                 no_data,
+                 verbose,
+                 n,
+                 band,
+                 open_bands,
+                 values) for didx, dfrow in zones_df.iterrows())
+
+    results = []
+
+    with multi.Pool(processes=n_jobs) as executor:
+
+        for result in executor.imap(_worker, data_gen, chunksize=chunksize):
+            results.append(result)
 
     if isinstance(band, int):
         n_bands = 1
@@ -603,6 +628,7 @@ class RasterStats(ZonesMixin):
         verbose (Optional[int]): The verbosity level. Default is 0.
         n_jobs (Optional[int]): The number of parallel processes (zones). Default is 1.
             *Currently, this only works with one statistic.
+        chunksize (Optional[int]): The ``chunksize`` argument passed to ``multiprocessing.Pool().imap``.
 
     Examples:
         >>> import zones
@@ -630,7 +656,8 @@ class RasterStats(ZonesMixin):
                  band=None,
                  column_prefix=None,
                  verbose=0,
-                 n_jobs=1):
+                 n_jobs=1,
+                 chunksize=1):
 
         self.values = values
         self.zones = zones
@@ -641,6 +668,7 @@ class RasterStats(ZonesMixin):
         self.band = band
         self.verbose = verbose
         self.n_jobs = n_jobs
+        self.chunksize = chunksize
         self.column_prefix = column_prefix
 
         self.stats = None
@@ -673,7 +701,8 @@ class RasterStats(ZonesMixin):
                                               self.values,
                                               self.band,
                                               self.open_bands,
-                                              self.n_jobs)
+                                              self.n_jobs,
+                                              self.chunksize)
 
         else:
 
