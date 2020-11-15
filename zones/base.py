@@ -132,7 +132,7 @@ class ZonesMixin(object):
 
             else:
 
-                file_extension = os.path.splitext(os.path.split(data_file)[1])[1].lower().strip()
+                file_extension = Path(data_file).suffix.lower().strip()
 
                 if file_extension in ['.shp', '.gpkg']:
                     return gpd.read_file(data_file).reset_index(), None
@@ -343,7 +343,7 @@ class ZonesMixin(object):
 
             sr = osr.SpatialReference()
             util.check_axis_order(sr)
-            sr.ImportFromWkt(self.values_src.projection)
+            sr.ImportFromWkt(self.values_src.crs.to_wkt())
             crs_wkt = sr.ExportToWkt()
 
         return crs_wkt

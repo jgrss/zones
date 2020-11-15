@@ -121,7 +121,8 @@ def _rasterize_zone(geom, src_wkt, image_src, image_name, open_bands, return_pol
         if geom_df.empty:
             return None, None, None, None, None, None
 
-        geom = gpd.clip(geom_df, raster_polygon).geometry[0]
+        geom_clip = gpd.clip(geom_df, raster_polygon)
+        src_wkt = geom_clip.crs.to_wkt()
 
     # Create a memory layer to rasterize from.
     datasource = ogr.GetDriverByName('Memory').CreateDataSource('wrk')
@@ -129,12 +130,12 @@ def _rasterize_zone(geom, src_wkt, image_src, image_name, open_bands, return_pol
     sp_ref.ImportFromWkt(src_wkt)
     util.check_axis_order(sp_ref)
 
-    # Transform the geometry
+    # # Transform the geometry
     target_sr = osr.SpatialReference()
     target_sr.ImportFromWkt(image_src.crs.to_wkt())
     util.check_axis_order(target_sr)
     transform = osr.CoordinateTransformation(sp_ref, target_sr)
-    gdal_geom = ogr.CreateGeometryFromWkt(geom.to_wkt())
+    gdal_geom = ogr.CreateGeometryFromWkt(src_wkt)
     gdal_geom.Transform(transform)
 
     # Get the transformation boundary
