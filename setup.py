@@ -46,6 +46,7 @@ def get_package_data():
                       'datasets/vector/*.qpj',
                       'datasets/vector/*.shp',
                       'datasets/vector/*.shx',
+                      'datasets/vector/*.gpkg',
                       'helpers/*.so',
                       'helpers/*.cpp']}
 
