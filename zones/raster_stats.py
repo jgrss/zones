@@ -9,6 +9,7 @@ from .base import ZonesMixin
 from .stats import STAT_DICT
 from .helpers import merge_dictionary_keys
 from . import util
+from .errors import add_handler
 
 import numpy as np
 from osgeo import gdal, ogr, osr
@@ -26,6 +27,7 @@ from tqdm import tqdm
 
 
 logger = logging.getLogger(__name__)
+logger = add_handler(logger)
 
 
 def _merge_dicts(dict1, dict2):
@@ -104,6 +106,7 @@ def _rasterize_zone(geom, src_crs, image_src, image_name, open_bands, return_pol
 
     left, bottom, right, top = geom.bounds
 
+    # Check if any part of the Polygon is outside the raster bounds.
     if (left < image_src.bounds.left) or \
             (bottom < image_src.bounds.bottom) or \
             (right > image_src.bounds.right) or \
@@ -188,10 +191,22 @@ def _rasterize_zone(geom, src_crs, image_src, image_name, open_bands, return_pol
             image_array = image_src.data.sel(y=slice(top, bottom),
                                              x=slice(left, bottom)).values
 
-    if return_poly:
-        return poly_array, np.squeeze(image_array), max_left, min_top, min_right, max_bottom
+    if len(image_array.shape) > 2:
+        if image_array.shape[0] == 1:
+            image_array = image_array[0]
+
+    ycount_adjust = min(poly_array.shape[-2], image_array.shape[-2])
+    xcount_adjust = min(poly_array.shape[-1], image_array.shape[-1])
+
+    if len(image_array.shape) > 2:
+        image_array = image_array[:, :ycount_adjust, :xcount_adjust]
     else:
-        return np.squeeze(image_array)
+        image_array = image_array[:ycount_adjust, :xcount_adjust]
+
+    if return_poly:
+        return poly_array[:ycount_adjust, :xcount_adjust], image_array, left, top, right, bottom
+    else:
+        return image_array
 
 
 def _update_dict(didx, zones_dict, image_array, stats, band, no_data, image_bands):
