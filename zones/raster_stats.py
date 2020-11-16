@@ -19,7 +19,8 @@ import xarray as xr
 from shapely.geometry import Polygon
 import bottleneck as bn
 import rasterio as rio
-
+from rasterio import features
+from rasterio.windows import Window
 from joblib import Parallel, delayed
 from tqdm import tqdm
 
@@ -95,7 +96,7 @@ def _warp(input_image,
     return out_ds
 
 
-def _rasterize_zone(geom, src_wkt, image_src, image_name, open_bands, return_poly=True):
+def _rasterize_zone(geom, src_crs, image_src, image_name, open_bands, return_poly=True):
 
     """
     Rasterizes a polygon geometry
@@ -108,172 +109,72 @@ def _rasterize_zone(geom, src_wkt, image_src, image_name, open_bands, return_pol
             (right > image_src.bounds.right) or \
             (top > image_src.bounds.top):
 
-        # Clip the geometry to the raster extent
-        raster_polygon = Polygon([(image_src.bounds.left, image_src.bounds.bottom),
-                                  (image_src.bounds.left, image_src.bounds.top),
-                                  (image_src.bounds.right, image_src.bounds.top),
-                                  (image_src.bounds.right, image_src.bounds.bottom),
-                                  (image_src.bounds.left, image_src.bounds.bottom)])
+        # Get the minimum overlapping extent bounds
+        #   between the raster and the vector geometry
+        max_left = max(left, image_src.bounds.left)
+        min_top = min(top, image_src.bounds.top)
+        min_right = min(right, image_src.bounds.right)
+        max_bottom = max(bottom, image_src.bounds.bottom)
 
-        geom_df = gpd.GeoDataFrame(data=[0], geometry=[geom], crs=src_wkt)
-        geom_df = gpd.clip(geom_df, raster_polygon)
+        # Create a Polygon geometry of the minimum bounds
+        geom = Polygon([(max_left, max_bottom),
+                        (max_left, min_top),
+                        (min_right, min_top),
+                        (min_right, max_bottom),
+                        (max_left, max_bottom)])
+
+        geom_df = gpd.GeoDataFrame(data=[0], geometry=[geom], crs=src_crs)
 
         if geom_df.empty:
             return None, None, None, None, None, None
 
-        geom_clip = gpd.clip(geom_df, raster_polygon)
-        src_wkt = geom_clip.crs.to_wkt()
-
-    # Create a memory layer to rasterize from.
-    datasource = ogr.GetDriverByName('Memory').CreateDataSource('wrk')
-    sp_ref = osr.SpatialReference()
-    sp_ref.ImportFromWkt(src_wkt)
-    util.check_axis_order(sp_ref)
-
-    # # Transform the geometry
-    target_sr = osr.SpatialReference()
-    target_sr.ImportFromWkt(image_src.crs.to_wkt())
-    util.check_axis_order(target_sr)
-    transform = osr.CoordinateTransformation(sp_ref, target_sr)
-    gdal_geom = ogr.CreateGeometryFromWkt(src_wkt)
-    gdal_geom.Transform(transform)
-
-    # Get the transformation boundary
-    left, right, bottom, top = gdal_geom.GetEnvelope()
+        left, bottom, right, top = geom_df.total_bounds.tolist()
 
     # Get the y and x count of the vector geometry
-    xcount_vct = int(round((right - left) / abs(image_src.res[0])))
-    ycount_vct = int(round((top - bottom) / abs(image_src.res[1])))
+    xcount = int(round((right - left) / abs(image_src.res[0])))
+    ycount = int(round((top - bottom) / abs(image_src.res[1])))
 
-    # Get the minimum overlapping extent bounds
-    #   between the raster and the vector geometry
-    max_left = max(left, image_src.bounds.left)
-    min_top = min(top, image_src.bounds.top)
-    min_right = min(right, image_src.bounds.right)
-    max_bottom = max(bottom, image_src.bounds.bottom)
-
-    # Get the y and x count based on the minimum bounds
-    xcount = int(round((min_right - max_left) / abs(image_src.res[0])))
-    ycount = int(round((min_top - max_bottom) / abs(image_src.res[1])))
+    if (ycount < 1) or (xcount < 1):
+        return None, None, None, None, None, None
 
     if return_poly:
 
         # Get the transform for the full vector extent
-        vct_transform = Affine(abs(image_src.res[0]), 0.0, left, 0.0, -abs(image_src.res[1]), top)
+        transform = Affine(abs(image_src.res[0]), 0.0, left, 0.0, -abs(image_src.res[1]), top)
 
-        # Create the new layer
-        lyr = datasource.CreateLayer('', geom_type=ogr.wkbPolygon, srs=target_sr)
-        field_def = ogr.FieldDefn('Value', ogr.OFTInteger)
-        lyr.CreateField(field_def)
+        poly_array = features.rasterize([geom],
+                                        out_shape=(ycount, xcount),
+                                        transform=transform,
+                                        fill=0,
+                                        out=None,
+                                        all_touched=False,
+                                        default_value=1,
+                                        dtype='int32')
 
-        # Add a feature
-        feature = ogr.Feature(lyr.GetLayerDefn())
-        feature.SetGeometryDirectly(ogr.Geometry(wkt=str(gdal_geom)))
-        feature.SetField('Value', 1)
-        lyr.CreateFeature(feature)
-
-        # Create an in-memory object to rasterize to
-        try:
-            target_ds = gdal.GetDriverByName('MEM').Create('', xcount_vct, ycount_vct, 1, gdal.GDT_Byte)
-        except:
-            return None, None, None, None, None, None
-
-        # Set the transform and CRS
-        target_ds.SetGeoTransform([left, abs(image_src.res[0]), 0., top, 0., -abs(image_src.res[0])])
-        target_ds.SetProjection(target_sr.ExportToWkt())
-
-        # Rasterize the geometry
-        gdal.RasterizeLayer(target_ds, [1], lyr, options=['ATTRIBUTE=Value'])
-
-        # Get the upper left offsets of the geometry
-        vctj, vcti = ~vct_transform * (max_left + abs(image_src.res[1]) / 2.0, min_top - abs(image_src.res[0]) / 2.0)
-        vctj, vcti = int(vctj), int(vcti)
-
-        # Read the geometry as an array
-        poly_array = np.uint8(target_ds.GetRasterBand(1).ReadAsArray(vctj, vcti, xcount, ycount))
-
-        datasource = None
-        target_ds = None
-
-    # bottom = top - (ycount * abs(image_src.res[1]))
-    # right = left + (xcount * abs(image_src.res[0]))
-
-    if isinstance(image_name, str):
-
-        # Reproject the feature
-        # with rio.open(image_name, mode='r') as src:
-        #
-        #     # Get the transform and new shape of reprojecting the source image.
-        #     transform, width, height = rio.warp.calculate_default_transform(src.crs,
-        #                                                                     image_src.crs,  # destination crs
-        #                                                                     src.width,
-        #                                                                     src.height,
-        #                                                                     left=src.bounds.left,
-        #                                                                     bottom=src.bounds.bottom,
-        #                                                                     right=src.bounds.right,
-        #                                                                     top=src.bounds.top,
-        #                                                                     resolution=image_src.res)
-        #
-        #     # Setup the output array
-        #     if open_bands == -1:
-        #
-        #         bobj = rio.band(src, list(range(1, src.count+1)))
-        #         dst_array = np.empty((src.count, height, width), dtype='float32')
-        #
-        #     else:
-        #
-        #         bobj = rio.band(src, open_bands)
-        #
-        #         if isinstance(open_bands, int):
-        #             dst_array = np.empty((1, height, width), dtype='float32')
-        #         else:
-        #             dst_array = np.empty((len(open_bands), height, width), dtype='float32')
-        #
-        #     rio.warp.reproject(source=bobj,
-        #                        destination=dst_array,
-        #                        src_transform=src.transform,
-        #                        src_crs=src.crs,
-        #                        dst_transform=image_src.transform,
-        #                        dst_crs=image_src.crs,
-        #                        num_threads=1,
-        #                        warp_mem_limit=256)
+    if isinstance(image_name, str) or isinstance(image_name, Path):
 
         # Get the transform for the full image extent
         transform = Affine(abs(image_src.res[0]), 0.0, image_src.bounds.left, 0.0, -abs(image_src.res[1]), image_src.bounds.top)
 
         # Get the upper left offsets of the minimum bounds
-        j, i = ~transform * (max_left + abs(image_src.res[1]) / 2.0, min_top - abs(image_src.res[0]) / 2.0)
+        j, i = ~transform * (left + abs(image_src.res[1]) / 2.0, top - abs(image_src.res[0]) / 2.0)
         j, i = int(j), int(i)
 
-        out_ds = gdal.Open(image_name, GA_ReadOnly)
+        window = Window(row_off=i, col_off=j, width=xcount, height=ycount)
 
-        # out_ds = _warp(image_name,
-        #               '',
-        #               format='MEM',
-        #               in_proj=image_src.crs.to_wkt(),
-        #               out_proj=image_src.crs.to_wkt(),
-        #               cell_size=image_src.res[0],
-        #               multithread=True,
-        #               outputBounds=[left, bottom, right, top],
-        #               warpMemoryLimit=256)
+        if isinstance(open_bands, int):
 
-        if out_ds:
-
-            if isinstance(open_bands, int):
-
-                if open_bands == -1:
-                    open_bands_range = list(range(1, out_ds.RasterCount+1))
-                else:
-                    open_bands_range = list(range(open_bands, open_bands+1))
-
+            if open_bands == -1:
+                open_bands_range = list(range(1, image_src.count+1))
             else:
-                open_bands_range = open_bands
+                open_bands_range = list(range(open_bands, open_bands+1))
 
-            # Read the raster data as arrays
-            image_array = np.array([out_ds.GetRasterBand(band_idx).ReadAsArray(j, i, xcount, ycount)
-                                    for band_idx in open_bands_range], dtype='float32')
+        else:
+            open_bands_range = open_bands
 
-            out_ds = None
+        # Read the raster data as arrays
+        image_array = np.array([image_src.read(band_idx, window=window)
+                                for band_idx in open_bands_range], dtype='float64')
 
     else:
 
@@ -428,7 +329,7 @@ def _worker(*args):
         if didx % 100 == 0:
             logger.info('    Zone {:,d} of {:,d} ...'.format(didx+1, n))
 
-    if isinstance(values, str):
+    if isinstance(values, str) or isinstance(values, Path):
         values_src = rio.open(values, mode='r')
     else:
         values_src = values
@@ -444,7 +345,7 @@ def _worker(*args):
 
     if not geom:
 
-        if isinstance(values, str):
+        if isinstance(values, str) or isinstance(values, Path):
             values_src.close()
 
         return data_values
@@ -488,7 +389,7 @@ def _worker(*args):
 
         if not isinstance(poly_array, np.ndarray):
 
-            if isinstance(values, str):
+            if isinstance(values, str) or isinstance(values, Path):
                 values_src.close()
 
             return data_values
@@ -516,7 +417,7 @@ def _worker(*args):
 
                 if np.isnan(bn.nanmax(image_array)):
 
-                    if isinstance(values, str):
+                    if isinstance(values, str) or isinstance(values, Path):
                         values_src.close()
 
                     return data_values
@@ -549,7 +450,7 @@ def _worker(*args):
 
                     data_values[1+(bdidx*n_stats)+sidx] = data_values_stat
 
-    if isinstance(values, str):
+    if isinstance(values, str) or isinstance(values, Path):
         values_src.close()
 
     return data_values
@@ -598,7 +499,7 @@ def _calc_parallel(stats, src_wkt, raster_value, no_data, verbose, n, zones_df, 
         n_bands = 1
     else:
 
-        if isinstance(values, str):
+        if isinstance(values, str) or isinstance(values, Path):
 
             with rio.open(values) as src_tmp:
                 n_bands = src_tmp.count
@@ -678,7 +579,7 @@ class RasterStats(ZonesMixin):
 
         if self.other_values:
 
-            if isinstance(self.other_values, str):
+            if isinstance(self.other_values, str) or isinstance(self.other_values, Path):
                 self.other_values = [self.other_values]
 
     def zone_iter(self, stats):
@@ -707,7 +608,8 @@ class RasterStats(ZonesMixin):
 
         else:
 
-            for didx, df_row in tqdm(self.zones_df.iterrows(), total=self.zones_df.shape[0]):
+            for didx, df_row in tqdm(self.zones_df.iterrows(),
+                                     total=self.zones_df.shape[0]):
 
                 geom = df_row.geometry
 
