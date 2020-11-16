@@ -2,6 +2,7 @@ import logging
 
 from .base import ZonesMixin
 from .stats import STAT_DICT
+from .errors import add_handler
 
 import pandas as pd
 import geopandas as gpd
@@ -12,6 +13,7 @@ from tqdm import tqdm
 
 
 logger = logging.getLogger(__name__)
+logger = add_handler(logger)
 
 
 def worker(didx, df_row, stat, value_column):

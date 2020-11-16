@@ -1,11 +1,14 @@
 import logging
 
+from .errors import add_handler
+
 from osgeo import osr
 import pyproj
 from rasterio.crs import CRS
 
 
 logger = logging.getLogger(__name__)
+logger = add_handler(logger)
 
 
 def check_crs(crs):
@@ -21,10 +24,6 @@ def check_crs(crs):
     """
 
     if isinstance(crs, pyproj.crs.crs.CRS) or isinstance(crs, pyproj.crs.CRS) or isinstance(crs, pyproj.CRS):
-
-        # if crs.is_geographic:
-        #     dst_crs = CRS.from_wkt("""GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]]""")
-        # else:
 
         if isinstance(crs.to_epsg(), int):
             dst_crs = CRS.from_epsg(crs.to_epsg())

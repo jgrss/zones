@@ -5,7 +5,7 @@ import itertools
 from pathlib import Path
 import logging
 
-from .errors import ValuesFileError, StatsError, ZonesFileError
+from .errors import ValuesFileError, StatsError, ZonesFileError, add_handler
 from .stats import STAT_DICT
 from .helpers import create_dictionary
 from . import util
@@ -23,6 +23,7 @@ from shapely.geometry import Point, Polygon
 
 
 logger = logging.getLogger(__name__)
+logger = add_handler(logger)
 
 
 class ZonesMixin(object):
