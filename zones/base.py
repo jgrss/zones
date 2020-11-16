@@ -152,8 +152,9 @@ class ZonesMixin(object):
         self.other_values_df = []
         self.other_values_src = []
 
-        self.zones_df = self.check_if_geodf(self.zones)[0]
+        zones_df = self.check_if_geodf(self.zones)[0]
         self.values_df, self.values_src = self.check_if_geodf(self.values)
+        self.zones_df = zones_df.to_crs(self.values_src.crs)
 
         if self.other_values:
 
@@ -337,16 +338,16 @@ class ZonesMixin(object):
 
     def _prepare_crs(self):
 
-        crs_wkt = util.check_crs(self.zones_df.crs)
+        crs = util.check_crs(self.zones_df.crs)
 
-        if not crs_wkt:
+        if not crs:
 
             sr = osr.SpatialReference()
             util.check_axis_order(sr)
-            sr.ImportFromWkt(self.values_src.crs.to_wkt())
-            crs_wkt = sr.ExportToWkt()
+            sr.ImportFromProj4(self.values_src.crs.to_proj4())
+            crs = sr.ExportToWkt()
 
-        return crs_wkt
+        return crs
 
     def check_arguments(self, stats):
 
