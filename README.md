@@ -107,7 +107,7 @@ df_points = gpd.read_file('points.gpkg')
 
 # Buffer around the points to convert to Polygons
 df_points = pd.merge(df_points.drop(columns='geometry'), 
-                     df_points.buffer(30)\
+                     df_points.buffer(15)\
                          .to_frame()\
                          .rename(columns={0: 'geometry'}), 
                      left_index=True, 
