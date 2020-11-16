@@ -2,11 +2,13 @@ import logging
 
 from ..datasets import load_01_single
 from .. import RasterStats
+from ..errors import add_handler
 
 import numpy as np
 
 
 logger = logging.getLogger(__name__)
+logger = add_handler(logger)
 
 
 def test_01_single():
